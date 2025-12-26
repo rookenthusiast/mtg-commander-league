@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm uninstall:*)",
+      "Bash(curl:*)",
+      "Bash(bash)",
+      "Bash(export NVM_DIR=\"$HOME/.nvm\")",
+      "Bash([ -s \"$NVM_DIR/nvm.sh\" ])",
+      "Bash(. \"$NVM_DIR/nvm.sh\")",
+      "Bash(nvm install:*)",
+      "Bash(nvm use:*)",
+      "Bash(node --version)",
+      "Bash(rm:*)",
+      "Bash(npm install)",
+      "Bash(npm run dev:*)",
+      "Bash(npm --version:*)",
+      "Bash(bash -c:*)",
+      "WebSearch",
+      "WebFetch(domain:webaim.org)",
+      "Bash(npm outdated:*)",
+      "Bash(npm install:*)",
+      "WebFetch(domain:ui.nuxt.com)",
+      "Bash(for page in \"\" \"/leaderboard\" \"/decks\" \"/rules\" \"/auth/login\")",
+      "Bash(do echo \"Testing $page:\")",
+      "Bash(done)",
+      "Bash(xargs:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

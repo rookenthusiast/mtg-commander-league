@@ -1,0 +1,244 @@
+/* Lorwyn-inspired Storybook Styles */
+
+/* Decorative ornamental border */
+.storybook-border {
+  position: relative;
+  border: 3px solid #bf9625;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #fffef5 0%, #fff8f5 100%);
+  box-shadow:
+    0 4px 6px -1px rgba(191, 150, 37, 0.1),
+    0 2px 4px -1px rgba(191, 150, 37, 0.06),
+    inset 0 2px 4px 0 rgba(255, 255, 255, 0.8);
+}
+
+.storybook-border::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  right: -6px;
+  bottom: -6px;
+  background: linear-gradient(135deg, #ffc831, #ff9156);
+  border-radius: 22px;
+  z-index: -1;
+  opacity: 0.3;
+}
+
+/* Ornamental corner decorations */
+.corner-flourish {
+  position: relative;
+}
+
+.corner-flourish::before,
+.corner-flourish::after {
+  content: '❧';
+  position: absolute;
+  font-size: 1.5rem;
+  color: #bf9625;
+  opacity: 0.6;
+}
+
+.corner-flourish::before {
+  top: -0.5rem;
+  left: -0.5rem;
+}
+
+.corner-flourish::after {
+  bottom: -0.5rem;
+  right: -0.5rem;
+  transform: rotate(180deg);
+}
+
+/* Parchment texture effect */
+.parchment-texture {
+  background-image:
+    linear-gradient(to right, rgba(191, 150, 37, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(191, 150, 37, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Fairy tale glow effect */
+.fairy-glow {
+  animation: fairy-pulse 3s ease-in-out infinite;
+}
+
+@keyframes fairy-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(255, 200, 49, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(255, 200, 49, 0.5);
+  }
+}
+
+/* Storybook card style */
+.storybook-card {
+  background: linear-gradient(145deg, #fdfdf9 0%, #fafaf3 50%, #f5f4e7 100%);
+  border: 2px solid #dcd6ab;
+  border-radius: 16px;
+  box-shadow:
+    0 10px 15px -3px rgba(102, 79, 19, 0.1),
+    0 4px 6px -2px rgba(102, 79, 19, 0.05),
+    inset 0 2px 4px 0 rgba(255, 255, 255, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+.storybook-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg,
+    #ffc831 0%,
+    #ff9156 25%,
+    #67b967 50%,
+    #38bdf8 75%,
+    #a855f7 100%
+  );
+  opacity: 0.6;
+}
+
+/* Whimsical button style */
+.fantasy-button {
+  position: relative;
+  background: linear-gradient(135deg, #ffc831 0%, #e6b42c 100%);
+  border: 2px solid #99771e;
+  border-radius: 12px;
+  font-family: 'Crimson Text', Georgia, serif;
+  font-weight: 600;
+  color: #664f13;
+  padding: 0.75rem 1.5rem;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px -1px rgba(102, 79, 19, 0.2);
+}
+
+.fantasy-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px -2px rgba(102, 79, 19, 0.3);
+}
+
+.fantasy-button:active {
+  transform: translateY(0);
+}
+
+/* Curved organic shapes */
+.organic-shape {
+  border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+}
+
+/* Sun-ray effect for hero section */
+.sun-rays {
+  background:
+    radial-gradient(ellipse at center, transparent 0%, rgba(255, 200, 49, 0.1) 100%),
+    linear-gradient(135deg, #ffc831 0%, #ff9156 50%, #67b967 100%);
+  position: relative;
+}
+
+.sun-rays::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 200%;
+  height: 200%;
+  transform: translate(-50%, -50%) rotate(0deg);
+  background: repeating-conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 5deg,
+    rgba(255, 255, 255, 0.1) 5deg,
+    rgba(255, 255, 255, 0.1) 10deg
+  );
+  animation: rotate-rays 60s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes rotate-rays {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+/* Decorative divider */
+.story-divider {
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    #bf9625 20%,
+    #ffc831 50%,
+    #bf9625 80%,
+    transparent 100%
+  );
+  margin: 2rem 0;
+  position: relative;
+}
+
+.story-divider::after {
+  content: '✦';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fdfdf9;
+  padding: 0 1rem;
+  color: #ffc831;
+  font-size: 1.25rem;
+}
+
+/* Floating animation for whimsical elements */
+.float {
+  animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* Shine effect */
+.shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.shine::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  bottom: -50%;
+  left: -50%;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotateZ(45deg) translate(-100%, 0);
+  animation: shine 8s infinite;
+}
+
+@keyframes shine {
+  0% {
+    transform: rotateZ(45deg) translate(-100%, 0);
+  }
+  10% {
+    transform: rotateZ(45deg) translate(100%, 0);
+  }
+  100% {
+    transform: rotateZ(45deg) translate(100%, 0);
+  }
+}

@@ -1,0 +1,84 @@
+/* Import Tailwind and Nuxt UI first */
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+/* Define custom theme AFTER imports (required for Nuxt UI) */
+@theme static {
+  /* Custom Color Palettes */
+  --color-lorwyn-sky-50: #f0fffe;
+  --color-lorwyn-sky-100: #d6fffe;
+  --color-lorwyn-sky-200: #a3f4f3;
+  --color-lorwyn-sky-300: #7dd8d7;
+  --color-lorwyn-sky-400: #5bcbca;
+  --color-lorwyn-sky-500: #3eb5b4;
+  --color-lorwyn-sky-600: #2a9695;
+  --color-lorwyn-sky-700: #1f7877;
+  --color-lorwyn-sky-800: #175f5e;
+  --color-lorwyn-sky-900: #114b4a;
+  --color-lorwyn-sky-950: #0a3332;
+
+  --color-lorwyn-green-50: #f2fbf5;
+  --color-lorwyn-green-100: #e0f6e8;
+  --color-lorwyn-green-200: #c3edd4;
+  --color-lorwyn-green-300: #94ddb3;
+  --color-lorwyn-green-400: #6bc96e;
+  --color-lorwyn-green-500: #52b788;
+  --color-lorwyn-green-600: #3d9870;
+  --color-lorwyn-green-700: #31795c;
+  --color-lorwyn-green-800: #29614b;
+  --color-lorwyn-green-900: #224f3e;
+  --color-lorwyn-green-950: #1a3c2f;
+
+  --color-lorwyn-gold-50: #fefce8;
+  --color-lorwyn-gold-100: #fef9c3;
+  --color-lorwyn-gold-200: #fef08a;
+  --color-lorwyn-gold-300: #fde047;
+  --color-lorwyn-gold-400: #f4c430;
+  --color-lorwyn-gold-500: #e6b422;
+  --color-lorwyn-gold-600: #d4a419;
+  --color-lorwyn-gold-700: #a67c15;
+  --color-lorwyn-gold-800: #876417;
+  --color-lorwyn-gold-900: #724f18;
+  --color-lorwyn-gold-950: #422b0a;
+
+  --color-shadowmoor-purple-50: #f5f3ff;
+  --color-shadowmoor-purple-100: #ede9fe;
+  --color-shadowmoor-purple-200: #ddd6fe;
+  --color-shadowmoor-purple-300: #c4b5fd;
+  --color-shadowmoor-purple-400: #a78bfa;
+  --color-shadowmoor-purple-500: #8b6b9e;
+  --color-shadowmoor-purple-600: #6b4c9a;
+  --color-shadowmoor-purple-700: #5a3e82;
+  --color-shadowmoor-purple-800: #4a2e6e;
+  --color-shadowmoor-purple-900: #3c2459;
+  --color-shadowmoor-purple-950: #1f1229;
+
+  --color-shadowmoor-magenta-50: #fdf4ff;
+  --color-shadowmoor-magenta-100: #fae8ff;
+  --color-shadowmoor-magenta-200: #f5d0fe;
+  --color-shadowmoor-magenta-300: #f0abfc;
+  --color-shadowmoor-magenta-400: #e891c3;
+  --color-shadowmoor-magenta-500: #d66ba0;
+  --color-shadowmoor-magenta-600: #c44f84;
+  --color-shadowmoor-magenta-700: #a8356a;
+  --color-shadowmoor-magenta-800: #8b2d57;
+  --color-shadowmoor-magenta-900: #73284a;
+  --color-shadowmoor-magenta-950: #46102a;
+
+  --color-twilight-blue-50: #f0f4ff;
+  --color-twilight-blue-100: #e5edff;
+  --color-twilight-blue-200: #d0ddff;
+  --color-twilight-blue-300: #b0c5ff;
+  --color-twilight-blue-400: #9bb5d9;
+  --color-twilight-blue-500: #8aadd1;
+  --color-twilight-blue-600: #6b8ec1;
+  --color-twilight-blue-700: #5577b0;
+  --color-twilight-blue-800: #466191;
+  --color-twilight-blue-900: #3c5174;
+  --color-twilight-blue-950: #273348;
+
+  /* Custom Font Families */
+  --font-family-storybook: "Crimson Text", Georgia, serif;
+  --font-family-fantasy: "Cinzel Decorative", serif;
+  --font-family-handwritten: "Indie Flower", cursive;
+}
