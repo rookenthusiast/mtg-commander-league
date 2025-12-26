@@ -1,177 +1,233 @@
 <template>
-  <div class="space-y-6">
-    <UCard>
-      <template #header>
-        <h1 class="text-2xl font-bold">Submit Game Result</h1>
-      </template>
-
-      <div v-if="!user" class="text-center py-8">
-        <p class="text-gray-600 dark:text-gray-400 mb-4">
-          Please sign in to submit game results
-        </p>
-        <UButton to="/auth/login">
-          Sign In
-        </UButton>
+  <div class="submit-game-page">
+    <div class="submit-game-container">
+      <!-- Hero Header -->
+      <div class="submit-game-header">
+        <div class="icon-wrapper">
+          <span class="icon">⚔️</span>
+        </div>
+        <h1 class="title">Submit Game Result</h1>
+        <p class="subtitle">Record your Budget Ducks Commander League match</p>
       </div>
 
-      <form v-else @submit.prevent="handleSubmit" class="space-y-6">
-        <!-- Game Date -->
-        <div>
-          <label class="block text-sm font-medium mb-2">Game Date</label>
-          <UInput
-            v-model="form.date"
-            type="date"
-            required
-          />
+      <!-- Not Signed In State -->
+      <UCard v-if="!user" class="submit-game-card">
+        <div class="sign-in-prompt">
+          <div class="prompt-icon">🔐</div>
+          <h3 class="prompt-title">Sign In Required</h3>
+          <p class="prompt-text">
+            Please sign in to submit game results
+          </p>
+          <UButton to="/auth/login" size="xl" class="prompt-button">
+            Sign In
+          </UButton>
+        </div>
+      </UCard>
+
+      <!-- Submit Game Form -->
+      <UCard v-else class="submit-game-card">
+        <!-- No Players Warning -->
+        <div v-if="availablePlayers.length === 0" class="no-players-warning">
+          <div class="warning-icon">⚠️</div>
+          <h3 class="warning-title">No Players Found</h3>
+          <p class="warning-text">
+            No player profiles are available in the database. Players need to be registered before you can submit game results.
+          </p>
         </div>
 
-        <!-- Players Selection -->
-        <div>
-          <label class="block text-sm font-medium mb-2">
-            Players (Select 2-4 players)
-          </label>
-          <div class="space-y-2">
-            <div
-              v-for="(player, index) in form.players"
-              :key="index"
-              class="flex items-center gap-2"
-            >
-              <USelect
-                v-model="form.players[index].playerId"
-                :options="availablePlayers"
-                placeholder="Select Player"
-                class="flex-1"
-              />
-              <USelect
-                v-model="form.players[index].deckId"
-                :options="getPlayerDecks(form.players[index].playerId)"
-                placeholder="Select Deck"
-                class="flex-1"
-              />
-              <UButton
-                v-if="form.players.length > 2"
-                icon="i-heroicons-trash"
-                color="red"
-                variant="ghost"
-                @click="removePlayer(index)"
-              />
+        <UForm v-else :state="formState" :validate="validate" class="space-y-8" @submit="handleSubmit">
+          <!-- Game Date -->
+          <UFormField label="Game Date" name="date" required>
+            <UInput
+              v-model="formState.date"
+              type="date"
+              size="xl"
+              icon="i-heroicons-calendar"
+              class="w-full"
+            />
+          </UFormField>
+
+          <!-- Players Selection -->
+          <div class="players-section">
+            <label class="section-label">
+              Players (Select 3-4 players)
+            </label>
+            <div class="space-y-4">
+              <div
+                v-for="(player, index) in formState.players"
+                :key="index"
+                class="player-row"
+              >
+                <div class="player-number">{{ index + 1 }}</div>
+                <div class="player-fields">
+                  <UFormField label="Player" :name="`players[${index}].playerId`" class="flex-1">
+                    <USelect
+                      v-model="formState.players[index].playerId"
+                      :options="availablePlayers"
+                      placeholder="Select Player"
+                      size="xl"
+                      class="w-full"
+                      @update:model-value="onPlayerChange(index)"
+                    />
+                  </UFormField>
+                  <UFormField label="Deck" :name="`players[${index}].deckId`" class="flex-1">
+                    <USelect
+                      v-model="formState.players[index].deckId"
+                      :options="getPlayerDecks(formState.players[index].playerId)"
+                      placeholder="Select Deck"
+                      size="xl"
+                      class="w-full"
+                      :disabled="!formState.players[index].playerId"
+                    />
+                  </UFormField>
+                </div>
+                <UButton
+                  v-if="formState.players.length > 3"
+                  icon="i-heroicons-trash"
+                  color="error"
+                  variant="ghost"
+                  size="xl"
+                  class="remove-button"
+                  @click="removePlayer(index)"
+                />
+              </div>
             </div>
+
+            <UButton
+              v-if="formState.players.length < 4"
+              icon="i-heroicons-plus"
+              variant="outline"
+              size="lg"
+              class="add-player-button"
+              @click="addPlayer"
+            >
+              Add Player
+            </UButton>
           </div>
 
-          <UButton
-            v-if="form.players.length < 4"
-            icon="i-heroicons-plus"
-            variant="outline"
-            class="mt-2"
-            @click="addPlayer"
+          <!-- Winner Selection -->
+          <UFormField label="Winner" name="winnerId" required>
+            <USelect
+              v-model="formState.winnerId"
+              :options="playerOptions"
+              placeholder="Select Winner"
+              size="xl"
+              icon="i-heroicons-trophy"
+              class="w-full"
+            />
+          </UFormField>
+
+          <!-- Placement (for 3-4 player games) -->
+          <UFormField
+            v-if="formState.players.length >= 3"
+            label="Final Placement"
+            name="placements"
+            help="Order players from 1st place (winner) to last place"
           >
-            Add Player
-          </UButton>
-        </div>
-
-        <!-- Winner Selection -->
-        <div>
-          <label class="block text-sm font-medium mb-2">Winner</label>
-          <USelect
-            v-model="form.winnerId"
-            :options="playerOptions"
-            placeholder="Select Winner"
-            required
-          />
-        </div>
-
-        <!-- Placement (for 3-4 player games) -->
-        <div v-if="form.players.length >= 3">
-          <label class="block text-sm font-medium mb-2">Final Placement</label>
-          <div class="space-y-2">
-            <div
-              v-for="(player, index) in form.players"
-              :key="index"
-              class="flex items-center gap-2"
-            >
-              <span class="w-8 text-center font-semibold">{{ index + 1 }}</span>
-              <USelect
-                v-model="form.placements[index]"
-                :options="playerOptions"
-                placeholder="Select Player"
-              />
+            <div class="placement-section">
+              <div class="space-y-3">
+                <div
+                  v-for="(placement, index) in formState.placements"
+                  :key="index"
+                  class="placement-row"
+                >
+                  <span class="placement-number">{{ index + 1 }}{{ getPlacementSuffix(index + 1) }}</span>
+                  <USelect
+                    v-model="formState.placements[index]"
+                    :options="playerOptions"
+                    :placeholder="`Select ${getPlacementOrdinal(index + 1)} place`"
+                    size="lg"
+                    class="flex-1"
+                  />
+                </div>
+              </div>
             </div>
+          </UFormField>
+
+          <!-- Game Notes -->
+          <UFormField
+            label="Game Notes (Optional)"
+            name="notes"
+            help="Any notable plays, combos, or interesting moments"
+          >
+            <UTextarea
+              v-model="formState.notes"
+              placeholder="Describe what happened during the game..."
+              :rows="4"
+              size="xl"
+              class="w-full"
+            />
+          </UFormField>
+
+          <!-- Turn Count -->
+          <UFormField
+            label="Turn Count (Optional)"
+            name="turnCount"
+            help="How many turns did the game last?"
+          >
+            <UInput
+              v-model.number="formState.turnCount"
+              type="number"
+              :min="1"
+              placeholder="e.g., 8"
+              size="xl"
+              icon="i-heroicons-arrow-path"
+              class="w-full"
+            />
+          </UFormField>
+
+          <!-- Submit Buttons -->
+          <div class="button-group">
+            <UButton
+              type="submit"
+              size="xl"
+              :loading="isSubmitting"
+              :disabled="!isFormValid"
+              class="submit-button"
+            >
+              Submit Game
+            </UButton>
+            <UButton
+              type="button"
+              variant="outline"
+              size="xl"
+              class="reset-button"
+              @click="resetForm"
+            >
+              Reset
+            </UButton>
           </div>
-        </div>
-
-        <!-- Game Notes -->
-        <div>
-          <label class="block text-sm font-medium mb-2">
-            Game Notes (Optional)
-          </label>
-          <UTextarea
-            v-model="form.notes"
-            placeholder="Any notable plays, combos, or interesting moments..."
-            :rows="4"
-          />
-        </div>
-
-        <!-- Turn Count -->
-        <div>
-          <label class="block text-sm font-medium mb-2">
-            Turn Count (Optional)
-          </label>
-          <UInput
-            v-model.number="form.turnCount"
-            type="number"
-            min="1"
-            placeholder="How many turns did the game last?"
-          />
-        </div>
-
-        <!-- Submit Button -->
-        <div class="flex gap-4">
-          <UButton
-            type="submit"
-            size="lg"
-            :loading="isSubmitting"
-            :disabled="!isFormValid"
-          >
-            Submit Game
-          </UButton>
-          <UButton
-            type="button"
-            variant="outline"
-            size="lg"
-            @click="resetForm"
-          >
-            Reset
-          </UButton>
-        </div>
-      </form>
-    </UCard>
+        </UForm>
+      </UCard>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 const { user } = useAuth()
+const { getDocuments, addDocument, updateDocument, increment } = useFirestore()
+const toast = useToast()
 
 const isSubmitting = ref(false)
 
-const form = ref({
+const formState = reactive({
   date: new Date().toISOString().split('T')[0],
   players: [
+    { playerId: '', deckId: '' },
     { playerId: '', deckId: '' },
     { playerId: '', deckId: '' }
   ],
   winnerId: '',
-  placements: [],
+  placements: ['', '', ''] as string[],
   notes: '',
-  turnCount: null
+  turnCount: null as number | null
 })
 
-const { getDocuments } = useFirestore()
-
-const availablePlayers = ref([])
-const availableDecks = ref([])
+const availablePlayers = ref<Array<{ value: string; label: string }>>([])
+const availableDecks = ref<Array<{ value: string; label: string; ownerId: string }>>([])
 
 const playerOptions = computed(() => {
-  return form.value.players
+  return formState.players
     .filter(p => p.playerId)
     .map(p => ({
       value: p.playerId,
@@ -181,24 +237,56 @@ const playerOptions = computed(() => {
 
 const isFormValid = computed(() => {
   return (
-    form.value.players.length >= 2 &&
-    form.value.players.every(p => p.playerId && p.deckId) &&
-    form.value.winnerId
+    formState.players.length >= 3 &&
+    formState.players.every(p => p.playerId && p.deckId) &&
+    formState.winnerId
   )
 })
 
+const validate = (state: typeof formState) => {
+  const errors = []
+
+  if (!state.date) {
+    errors.push({ name: 'date', message: 'Game date is required' })
+  }
+
+  state.players.forEach((player, index) => {
+    if (!player.playerId) {
+      errors.push({ name: `players[${index}].playerId`, message: 'Player is required' })
+    }
+    if (!player.deckId) {
+      errors.push({ name: `players[${index}].deckId`, message: 'Deck is required' })
+    }
+  })
+
+  if (!state.winnerId) {
+    errors.push({ name: 'winnerId', message: 'Winner selection is required' })
+  }
+
+  return errors
+}
+
 const addPlayer = () => {
-  if (form.value.players.length < 4) {
-    form.value.players.push({ playerId: '', deckId: '' })
+  if (formState.players.length < 4) {
+    formState.players.push({ playerId: '', deckId: '' })
+    formState.placements = Array(formState.players.length).fill('')
   }
 }
 
 const removePlayer = (index: number) => {
-  form.value.players.splice(index, 1)
+  if (formState.players.length > 3) {
+    formState.players.splice(index, 1)
+    formState.placements = Array(formState.players.length).fill('')
+  }
+}
+
+const onPlayerChange = (index: number) => {
+  // Clear deck selection when player changes
+  formState.players[index].deckId = ''
 }
 
 const getPlayerDecks = (playerId: string) => {
-  // Filter decks by player
+  if (!playerId) return []
   return availableDecks.value.filter(deck => deck.ownerId === playerId)
 }
 
@@ -207,25 +295,37 @@ const getPlayerName = (playerId: string) => {
   return player?.label || ''
 }
 
+const getPlacementSuffix = (place: number) => {
+  if (place === 1) return 'st'
+  if (place === 2) return 'nd'
+  if (place === 3) return 'rd'
+  return 'th'
+}
+
+const getPlacementOrdinal = (place: number) => {
+  if (place === 1) return '1st'
+  if (place === 2) return '2nd'
+  if (place === 3) return '3rd'
+  return `${place}th`
+}
+
 const handleSubmit = async () => {
   isSubmitting.value = true
 
   try {
-    const { addDocument, updateDocument, increment } = useFirestore()
-
     // Submit game to Firestore
-    const gameId = await addDocument('games', {
-      date: form.value.date,
-      players: form.value.players,
-      winnerId: form.value.winnerId,
-      placements: form.value.placements,
-      notes: form.value.notes,
-      turnCount: form.value.turnCount
+    await addDocument('games', {
+      date: formState.date,
+      players: formState.players,
+      winnerId: formState.winnerId,
+      placements: formState.placements,
+      notes: formState.notes,
+      turnCount: formState.turnCount
     })
 
     // Update player stats
-    for (const gamePlayer of form.value.players) {
-      const isWinner = gamePlayer.playerId === form.value.winnerId
+    for (const gamePlayer of formState.players) {
+      const isWinner = gamePlayer.playerId === formState.winnerId
 
       // Update player document
       await updateDocument('players', gamePlayer.playerId, {
@@ -245,30 +345,37 @@ const handleSubmit = async () => {
     }
 
     // Show success message
-    alert('Game submitted successfully!')
+    toast.add({
+      title: 'Game Submitted!',
+      description: 'Match results have been recorded successfully.',
+      color: 'success'
+    })
 
     // Reset form
     resetForm()
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error submitting game:', error)
-    alert('Error submitting game. Please try again.')
+    toast.add({
+      title: 'Submission Failed',
+      description: error?.message || 'Unable to submit game. Please try again.',
+      color: 'error'
+    })
   } finally {
     isSubmitting.value = false
   }
 }
 
 const resetForm = () => {
-  form.value = {
-    date: new Date().toISOString().split('T')[0],
-    players: [
-      { playerId: '', deckId: '' },
-      { playerId: '', deckId: '' }
-    ],
-    winnerId: '',
-    placements: [],
-    notes: '',
-    turnCount: null
-  }
+  formState.date = new Date().toISOString().split('T')[0]
+  formState.players = [
+    { playerId: '', deckId: '' },
+    { playerId: '', deckId: '' },
+    { playerId: '', deckId: '' }
+  ]
+  formState.winnerId = ''
+  formState.placements = ['', '', '']
+  formState.notes = ''
+  formState.turnCount = null
 }
 
 onMounted(async () => {
@@ -289,6 +396,186 @@ onMounted(async () => {
     }))
   } catch (error) {
     console.error('Error fetching data:', error)
+    toast.add({
+      title: 'Error Loading Data',
+      description: 'Unable to load players and decks. Please refresh the page.',
+      color: 'error'
+    })
   }
 })
 </script>
+
+<style scoped>
+@reference "~/assets/css/main.css";
+
+/* ================= PAGE LAYOUT ================= */
+
+.submit-game-page {
+  @apply min-h-screen py-12 px-4;
+}
+
+.submit-game-container {
+  @apply w-full max-w-3xl mx-auto space-y-6;
+}
+
+/* ================= HEADER ================= */
+
+.submit-game-header {
+  @apply text-center space-y-4;
+}
+
+.icon-wrapper {
+  @apply inline-flex items-center justify-center w-20 h-20 rounded-full mx-auto;
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.3),
+    rgba(168, 85, 247, 0.3)
+  );
+  backdrop-filter: blur(10px);
+  box-shadow:
+    0 8px 32px rgba(139, 92, 246, 0.2),
+    inset 0 1px 2px rgba(255, 255, 255, 0.1);
+}
+
+.icon {
+  @apply text-5xl;
+}
+
+.title {
+  @apply text-4xl md:text-5xl font-black bg-linear-to-r from-lorwyn-gold-400 via-shadowmoor-magenta-400 to-shadowmoor-purple-500 bg-clip-text text-transparent;
+}
+
+.subtitle {
+  @apply text-base md:text-lg text-twilight-blue-200 font-medium;
+}
+
+/* ================= CARD ================= */
+
+.submit-game-card {
+  @apply bg-linear-to-br from-shadowmoor-purple-900/80 to-twilight-blue-900/80 backdrop-blur-sm shadow-2xl p-8;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+}
+
+.submit-game-card::before {
+  content: '';
+  @apply absolute inset-0 rounded-lg pointer-events-none;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    transparent 50%
+  );
+}
+
+/* ================= FORM ================= */
+
+:deep(.submit-game-card .space-y-8) {
+  @apply relative z-10;
+}
+
+/* Update help text color to be more visible */
+:deep(.submit-game-card [class*="help"]) {
+  @apply text-lorwyn-green-300;
+}
+
+:deep(.submit-game-card .text-muted) {
+  @apply text-lorwyn-green-300;
+}
+
+/* ================= SIGN IN PROMPT ================= */
+
+.sign-in-prompt {
+  @apply text-center py-12 space-y-6;
+}
+
+.prompt-icon {
+  @apply text-6xl mb-4;
+}
+
+.prompt-title {
+  @apply text-2xl font-black text-white;
+}
+
+.prompt-text {
+  @apply text-twilight-blue-300 text-lg;
+}
+
+.prompt-button {
+  @apply bg-linear-to-r from-lorwyn-gold-500 to-shadowmoor-magenta-500 hover:from-lorwyn-gold-600 hover:to-shadowmoor-magenta-600 text-white font-bold shadow-lg transition-all duration-200 hover:scale-[1.02] hover:shadow-xl;
+}
+
+/* ================= SECTIONS ================= */
+
+.players-section {
+  @apply space-y-4;
+}
+
+.section-label {
+  @apply block text-base font-bold text-white mb-4;
+}
+
+.player-row {
+  @apply flex flex-col sm:flex-row items-start gap-3 p-4 rounded-lg bg-twilight-blue-800/30 border border-twilight-blue-700/30;
+}
+
+.player-number {
+  @apply flex items-center justify-center w-10 h-10 rounded-full bg-linear-to-br from-lorwyn-gold-500/30 to-shadowmoor-magenta-500/30 text-white font-black text-lg shrink-0;
+}
+
+.player-fields {
+  @apply flex flex-col sm:flex-row gap-3 flex-1 w-full;
+}
+
+.remove-button {
+  @apply sm:mt-6 self-end sm:self-start;
+}
+
+.add-player-button {
+  @apply border-2 border-twilight-blue-600/50 hover:bg-twilight-blue-800/30 hover:border-twilight-blue-500/70 font-semibold text-white transition-all duration-200;
+}
+
+/* ================= PLACEMENT ================= */
+
+.placement-section {
+  @apply w-full;
+}
+
+.placement-row {
+  @apply flex items-center gap-3;
+}
+
+.placement-number {
+  @apply flex items-center justify-center w-16 h-10 rounded-full bg-linear-to-br from-lorwyn-gold-500/30 to-shadowmoor-magenta-500/30 text-white font-black text-sm shrink-0;
+}
+
+/* ================= NO PLAYERS WARNING ================= */
+
+.no-players-warning {
+  @apply text-center py-12 space-y-6;
+}
+
+.warning-icon {
+  @apply text-6xl mb-4;
+}
+
+.warning-title {
+  @apply text-2xl font-black text-white;
+}
+
+.warning-text {
+  @apply text-twilight-blue-300 text-lg max-w-md mx-auto;
+}
+
+/* ================= BUTTONS ================= */
+
+.button-group {
+  @apply flex flex-col sm:flex-row gap-4 pt-4;
+}
+
+.submit-button {
+  @apply flex-1 bg-linear-to-r from-lorwyn-gold-500 to-shadowmoor-magenta-500 hover:from-lorwyn-gold-600 hover:to-shadowmoor-magenta-600 text-white font-bold shadow-lg transition-all duration-200 hover:scale-[1.02] hover:shadow-xl;
+}
+
+.reset-button {
+  @apply flex-1 border-2 border-twilight-blue-600/50 hover:bg-twilight-blue-800/30 hover:border-twilight-blue-500/70 font-semibold text-white transition-all duration-200;
+}
+</style>

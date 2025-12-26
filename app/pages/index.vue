@@ -1,8 +1,8 @@
 <template>
-  <UContainer class="h-full content-center">
+  <div class="flex items-center justify-center h-full">
     <!-- Hero Background -->
     <div class="hero-background">
-      <div class="hero-background-image"></div>
+      <div class="hero-background-image" />
     </div>
 
     <!-- Hero Section -->
@@ -19,7 +19,7 @@
         </UButton>
       </div>
     </div>
-  </UContainer>
+  </div>
 </template>
 
 <script setup lang="ts">

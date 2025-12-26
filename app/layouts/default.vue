@@ -1,5 +1,6 @@
 <template>
-  <div class="flex flex-col bg-linear-to-br from-shadowmoor-purple-950 via-twilight-blue-950 to-shadowmoor-purple-950">
+  <div
+    class="flex flex-col min-h-screen bg-linear-to-br from-shadowmoor-purple-950 via-twilight-blue-950 to-shadowmoor-purple-950">
     <!-- Header Navigation -->
     <header
       class="shrink-0 bg-linear-to-r from-twilight-blue-900/95 via-shadowmoor-purple-900/95 to-twilight-blue-900/95 backdrop-blur-md shadow-2xl z-50">
@@ -117,17 +118,17 @@
     </header>
 
     <!-- Main content -->
-    <main class="flex-1">
+    <main class="flex-1 content-center">
       <slot />
     </main>
 
     <!-- Footer -->
     <footer
-      :class="isIndexPage ? 'shrink-0 relative bg-linear-to-r from-shadowmoor-purple-900 via-twilight-blue-900 to-shadowmoor-purple-900' : 'relative bg-linear-to-r from-shadowmoor-purple-900 via-twilight-blue-900 to-shadowmoor-purple-900 mt-auto'">
+      class="shrink-0 relative bg-linear-to-r from-shadowmoor-purple-900 via-twilight-blue-900 to-shadowmoor-purple-900">
       <!-- Top accent line -->
 
       <UContainer>
-        <div class="py-8">
+        <div class="py-2">
           <div class="flex flex-col md:flex-row items-center justify-between gap-4">
             <!-- Logo & Copyright -->
             <div class="flex items-center gap-3">
@@ -162,9 +163,6 @@
 <script setup lang="ts">
 const isMobileMenuOpen = ref(false)
 const { user, signOut } = useAuth()
-const route = useRoute()
-
-const isIndexPage = computed(() => route.path === '/')
 
 const handleSignOut = async () => {
   await signOut()
