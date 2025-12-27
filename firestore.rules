@@ -1,0 +1,82 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // Seasons - read all, write only for admins
+    match /seasons/{seasonId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // PlayerSeasons - read all, write only for authenticated users
+    match /playerSeasons/{playerSeasonId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.playerId == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.playerId == request.auth.uid;
+      // Users can delete their own, admins can delete any
+      allow delete: if (request.auth != null && resource.data.playerId == request.auth.uid) || isAdmin();
+    }
+
+    // Players - read all, write restricted
+    match /players/{playerId} {
+      allow read: if true;
+      allow create, update: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      // Users can delete their own, admins can delete any
+      allow delete: if (request.auth != null && resource.data.userId == request.auth.uid) || isAdmin();
+    }
+
+    // Users - read all for admins, read own for users, write own (except isAdmin field)
+    match /users/{userId} {
+      // Users can read their own document
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Allow reading user document for admin check (needed for isAdmin() function)
+      allow get: if request.auth != null;
+
+      // Admins can list all users
+      allow list: if isAdmin();
+
+      // Users can create their own document (on signup)
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.isAdmin == false;
+
+      // Users can update their own document (except isAdmin field)
+      allow update: if request.auth != null
+        && request.auth.uid == userId
+        && request.resource.data.isAdmin == resource.data.isAdmin;
+
+      // Only admins can update any user's isAdmin field
+      allow update: if isAdmin();
+
+      // Only admins can delete users
+      allow delete: if isAdmin();
+    }
+
+    // Games - read all, authenticated users can write
+    match /games/{gameId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null;
+    }
+
+    // Decks - read all, owner can write
+    match /decks/{deckId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null
+        && resource.data.ownerId == request.auth.uid;
+      // Owners can delete their own, admins can delete any
+      allow delete: if (request.auth != null && resource.data.ownerId == request.auth.uid) || isAdmin();
+    }
+  }
+}

@@ -23,7 +23,8 @@
       "Bash(for page in \"\" \"/leaderboard\" \"/decks\" \"/rules\" \"/auth/login\")",
       "Bash(do echo \"Testing $page:\")",
       "Bash(done)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "mcp__nuxt-ui-remote__get-component"
     ],
     "deny": [],
     "ask": []

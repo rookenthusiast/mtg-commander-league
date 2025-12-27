@@ -23,6 +23,10 @@ logs
 .env.*
 !.env.example
 
+# Firebase service account keys
+serviceAccountKey.json
+**/serviceAccountKey*.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -6,9 +6,9 @@
         <div class="hidden md:block">
           <div class="trophy-icon">🏆</div>
         </div>
-        <div>
+        <div class="flex-1">
           <h1 class="hero-title">Season Leaderboard</h1>
-          <p class="hero-subtitle">Compete for glory in the Lorwyn Commander League</p>
+          <p class="hero-subtitle">{{ currentSeasonName }}</p>
         </div>
       </div>
     </UCard>
@@ -34,16 +34,19 @@
 
     <!-- Filters -->
     <div class="filters-bar">
-      <USelect v-model="selectedSeason" :options="seasons" option-attribute="label" value-attribute="value"
-        placeholder="Select Season" class="w-48" />
-      <div class="flex gap-2">
-        <UButton variant="outline" @click="toggleTestData">
-          {{ useTestData ? 'Use Real Data' : 'Use Test Data' }}
-        </UButton>
-        <UButton variant="outline" @click="refreshLeaderboard" icon="i-heroicons-arrow-path">
-          Refresh
-        </UButton>
+      <div class="flex items-center gap-3">
+        <label class="text-twilight-blue-200 font-semibold">Season:</label>
+        <USelect
+          v-model="selectedSeasonId"
+          :items="seasonOptions"
+          value-key="value"
+          placeholder="Select Season"
+          class="w-64"
+        />
       </div>
+      <UButton variant="outline" @click="refreshLeaderboard" icon="i-heroicons-arrow-path">
+        Refresh
+      </UButton>
     </div>
 
     <!-- Top 3 Podium -->
@@ -139,28 +142,28 @@
           th: 'text-white font-semibold',
           td: 'text-white',
         }">
-          <template #rank-data="{ row }">
-            <span class="rank-number">#{{ row.rank }}</span>
+          <template #rank-cell="{ row }">
+            <span class="rank-number">#{{ row.original.rank }}</span>
           </template>
 
-          <template #name-data="{ row }">
+          <template #name-cell="{ row }">
             <div class="player-info">
-              <div class="player-avatar-small">{{ row.name.charAt(0) }}</div>
-              <span class="player-name-text">{{ row.name }}</span>
+              <div class="player-avatar-small">{{ row.original.name.charAt(0) }}</div>
+              <span class="player-name-text">{{ row.original.name }}</span>
             </div>
           </template>
 
-          <template #winRate-data="{ row }">
+          <template #winRate-cell="{ row }">
             <div class="win-rate-column">
               <div class="mini-progress-bar">
-                <div class="mini-progress-fill" :style="{ width: row.winRate + '%' }"></div>
+                <div class="mini-progress-fill" :style="{ width: row.original.winRate + '%' }"></div>
               </div>
-              <span class="percentage-text">{{ row.winRate }}%</span>
+              <span class="percentage-text">{{ row.original.winRate }}%</span>
             </div>
           </template>
 
-          <template #points-data="{ row }">
-            <span class="points-value">{{ row.points }}</span>
+          <template #points-cell="{ row }">
+            <span class="points-value">{{ row.original.points }}</span>
           </template>
         </UTable>
       </UCard>
@@ -221,16 +224,16 @@
 </template>
 
 <script setup lang="ts">
-const { getDocuments, orderBy } = useFirestore()
+import type { Season, PlayerSeason } from '~/types'
 
-const selectedSeason = ref('current')
-const seasons = [
-  { label: 'Current Season', value: 'current' },
-  { label: '2024 Season 1', value: '2024-season-1' },
-  { label: '2024 Season 2', value: '2024-season-2' }
-]
-const useTestData = ref(true) // Start with test data to show dummy data
+const { getAllSeasons, getActiveSeason, getSeasonLeaderboard } = useSeasons()
 
+// Season management
+const allSeasons = ref<Season[]>([])
+const selectedSeasonId = ref<string>('')
+const currentSeasonName = ref('Loading...')
+
+// Leaderboard data
 interface Player {
   id: string
   name: string
@@ -246,25 +249,7 @@ const leagueStats = ref({
   avgWinRate: 0
 })
 
-// Mock test data
-const mockPlayers: Player[] = [
-  { id: '1', name: 'Aragorn the Ranger', wins: 28, games: 45, points: 142 },
-  { id: '2', name: 'Gandalf the Grey', wins: 25, games: 42, points: 135 },
-  { id: '3', name: 'Galadriel of Lothlórien', wins: 22, games: 38, points: 128 },
-  { id: '4', name: 'Elrond Half-elven', wins: 20, games: 40, points: 118 },
-  { id: '5', name: 'Thranduil the Elvenking', wins: 18, games: 35, points: 110 },
-  { id: '6', name: 'Círdan the Shipwright', wins: 17, games: 36, points: 105 },
-  { id: '7', name: 'Glorfindel of Rivendell', wins: 15, games: 32, points: 98 },
-  { id: '8', name: 'Celeborn the Wise', wins: 14, games: 30, points: 92 },
-  { id: '9', name: 'Gil-galad the High King', wins: 13, games: 28, points: 87 },
-  { id: '10', name: 'Finrod Felagund', wins: 12, games: 27, points: 82 },
-  { id: '11', name: 'Lúthien Tinúviel', wins: 11, games: 25, points: 78 },
-  { id: '12', name: 'Beren One-hand', wins: 10, games: 24, points: 74 },
-  { id: '13', name: 'Fëanor the Smith', wins: 9, games: 22, points: 69 },
-  { id: '14', name: 'Fingolfin the Valiant', wins: 8, games: 20, points: 64 },
-  { id: '15', name: 'Túrin Turambar', wins: 7, games: 18, points: 58 }
-]
-
+// Table columns
 const tableColumns = [
   {
     id: 'rank',
@@ -298,6 +283,17 @@ const tableColumns = [
   }
 ]
 
+// Computed: Season options for dropdown
+const seasonOptions = computed(() => {
+  const options = allSeasons.value.map((season: Season) => ({
+    label: season.isActive ? `${season.name} (Active)` : season.name,
+    value: season.id
+  }))
+  console.log('[Leaderboard] Season options:', options)
+  return options
+})
+
+// Computed: Top 3 players
 const topThree = computed(() => {
   return leaderboard.value.slice(0, 3).map((player: Player) => ({
     ...player,
@@ -305,6 +301,7 @@ const topThree = computed(() => {
   }))
 })
 
+// Computed: Remaining players (rank 4+)
 const remainingPlayers = computed(() => {
   return leaderboard.value.slice(3).map((player: Player, index: number) => ({
     ...player,
@@ -313,6 +310,7 @@ const remainingPlayers = computed(() => {
   }))
 })
 
+// Calculate league statistics
 const calculateStats = (players: Player[]) => {
   const totalGames = players.reduce((sum: number, p: Player) => sum + p.games, 0)
   const totalWins = players.reduce((sum: number, p: Player) => sum + p.wins, 0)
@@ -324,52 +322,71 @@ const calculateStats = (players: Player[]) => {
   }
 }
 
-const loadTestData = () => {
-  leaderboard.value = [...mockPlayers]
-  calculateStats(mockPlayers)
-}
+// Load seasons on mount
+const loadSeasons = async () => {
+  try {
+    const seasons = await getAllSeasons()
+    allSeasons.value = seasons
 
-const toggleTestData = () => {
-  useTestData.value = !useTestData.value
-  if (useTestData.value) {
-    loadTestData()
-  } else {
-    refreshLeaderboard()
+    // Get active season
+    const activeSeason = await getActiveSeason()
+
+    // Default to active season if it exists, otherwise first season
+    if (activeSeason) {
+      selectedSeasonId.value = activeSeason.id
+      currentSeasonName.value = activeSeason.name
+    } else if (seasons.length > 0) {
+      selectedSeasonId.value = seasons[0].id
+      currentSeasonName.value = seasons[0].name
+    }
+
+    // Load leaderboard for selected season
+    if (selectedSeasonId.value) {
+      await refreshLeaderboard()
+    }
+  } catch (error) {
+    console.error('Error loading seasons:', error)
+    currentSeasonName.value = 'Error loading seasons'
   }
 }
 
+// Refresh leaderboard data
 const refreshLeaderboard = async () => {
-  if (useTestData.value) {
-    loadTestData()
-    return
-  }
+  if (!selectedSeasonId.value) return
 
   try {
-    const players = await getDocuments('players', [
-      orderBy('points', 'desc')
-    ])
+    // Get playerSeasons for the selected season
+    const playerSeasons = await getSeasonLeaderboard(selectedSeasonId.value, 'points')
 
-    leaderboard.value = players.map((player: any) => ({
-      id: player.id,
-      name: player.displayName,
-      wins: player.wins || 0,
-      games: player.gamesPlayed || 0,
-      points: player.points || 0
+    // Transform to Player format
+    leaderboard.value = playerSeasons.map((ps: PlayerSeason) => ({
+      id: ps.id,
+      name: ps.displayName,
+      wins: ps.wins || 0,
+      games: ps.gamesPlayed || 0,
+      points: ps.points || 0
     }))
 
     calculateStats(leaderboard.value)
+
+    // Update current season name
+    const season = allSeasons.value.find((s: Season) => s.id === selectedSeasonId.value)
+    if (season) {
+      currentSeasonName.value = season.name
+    }
   } catch (error) {
     console.error('Error fetching leaderboard:', error)
   }
 }
 
-// Load test data on mount to show dummy data immediately
+// Watch for season changes and refresh leaderboard
+watch(selectedSeasonId, () => {
+  refreshLeaderboard()
+})
+
+// Initialize on mount
 onMounted(() => {
-  if (useTestData.value) {
-    loadTestData()
-  } else {
-    refreshLeaderboard()
-  }
+  loadSeasons()
 })
 </script>
 

@@ -1,27 +1,31 @@
 # MTG Commander League
 
-A web application for tracking budget Commander league games, decks, and standings. Built with Nuxt 3, Nuxt UI, and Firebase.
+A web application for tracking budget Commander league games, decks, and standings **with multi-season support**. Built with Nuxt 3, Nuxt UI, and Firebase. Features a beautiful glassmorphic design with Magic: The Gathering themed colors.
 
 ## Features
 
-- **Leaderboard**: Track player rankings and statistics
+- **Season Management**: Track multiple league seasons with independent leaderboards
+- **Player Registration**: Players register for each season to compete
+- **Season Leaderboard**: View rankings and statistics for current and past seasons
 - **Deck Management**: Register and view player decks with budget tracking
 - **Game Submission**: Submit game results and track match history
 - **Rules**: View league rules and scoring system
 - **Authentication**: Secure user authentication with Firebase (Email/Password and Google Sign-In)
 - **Real-time Updates**: Firebase Firestore for real-time data synchronization
+- **Glassmorphic UI**: Modern glass-morphism design with MTG-themed color palette
 
 ## Tech Stack
 
 - **Frontend**: Nuxt 3 + Vue 3
-- **UI Framework**: Nuxt UI (built on Tailwind CSS)
+- **UI Framework**: Nuxt UI v4 (built on Tailwind CSS)
 - **Backend/Database**: Firebase (Firestore + Authentication)
+- **Admin Tools**: Firebase Admin SDK for database migrations
 - **Deployment**: Vercel, Netlify, or Firebase Hosting (free tiers available)
 
 ## Prerequisites
 
 Before you begin, ensure you have the following installed:
-- Node.js (v18 or higher recommended)
+- Node.js (v20 or higher recommended)
 - npm or yarn
 - Git
 
@@ -47,7 +51,7 @@ npm install
 3. Enable **Firestore Database**:
    - Go to Firestore Database
    - Click "Create database"
-   - Choose "Start in production mode" (you can adjust security rules later)
+   - Choose "Start in production mode" (you'll add security rules later)
    - Select your region
 4. Enable **Authentication**:
    - Go to Authentication
@@ -79,34 +83,158 @@ FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 FIREBASE_APP_ID=your_app_id
 ```
 
-### 5. Set Up Firestore Database Structure
+### 5. Set Up Firestore Security Rules
 
-Create the following collections in Firestore:
+Deploy the security rules to your Firebase project:
 
-#### Collections:
-
-1. **users**
+1. Install Firebase CLI:
+   ```bash
+   npm install -g firebase-tools
    ```
-   - id: string (auto-generated)
+
+2. Login and initialize:
+   ```bash
+   firebase login
+   firebase init firestore
+   ```
+   - Select your Firebase project
+   - Use `firestore.rules` as your rules file
+
+3. Deploy rules:
+   ```bash
+   firebase deploy --only firestore:rules
+   ```
+
+Alternatively, copy the contents of `firestore.rules` and paste them in the Firebase Console under Firestore Database > Rules.
+
+### 6. Set Up Initial Season
+
+Create the first season manually in Firestore Console:
+
+1. Go to Firestore Database
+2. Create a collection called `seasons`
+3. Add a document with ID `season-1`:
+```javascript
+{
+  name: "Lorwyn Season",
+  slug: "lorwyn-2025",
+  startDate: [Current Timestamp],
+  endDate: null,
+  isActive: true,
+  description: "The inaugural Budget Ducks Commander League season",
+  createdAt: [Current Timestamp],
+  updatedAt: [Current Timestamp]
+}
+```
+
+### 7. Run Development Server
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## Project Structure
+
+```
+mtg-commander-league/
+├── app/
+│   ├── assets/           # CSS and static assets
+│   ├── components/       # Vue components
+│   ├── composables/      # Composable functions
+│   │   ├── useAuth.ts           # Authentication
+│   │   ├── useFirestore.ts      # Firestore operations
+│   │   └── useSeasons.ts        # Season management
+│   ├── layouts/          # Layout components
+│   │   └── default.vue          # Main layout with navigation
+│   ├── pages/            # Route pages
+│   │   ├── index.vue            # Home page
+│   │   ├── leaderboard.vue      # Season leaderboards
+│   │   ├── seasons/
+│   │   │   ├── index.vue        # Seasons overview
+│   │   │   └── register.vue     # Season registration
+│   │   ├── decks.vue            # Deck listing
+│   │   ├── rules.vue            # League rules
+│   │   ├── submit-game.vue      # Game submission form
+│   │   └── auth/
+│   │       ├── login.vue        # Login page
+│   │       └── register.vue     # Registration page
+│   ├── plugins/          # Nuxt plugins (Firebase initialization)
+│   └── public/           # Public static files
+├── scripts/              # Database migration scripts
+│   ├── migrate-to-seasons.js    # Season migration script
+│   └── README.md                # Migration documentation
+├── types/                # TypeScript type definitions
+│   └── index.ts                 # All interfaces
+├── .env                  # Environment variables (not in git)
+├── .env.example          # Environment variables template
+├── firestore.rules       # Firestore security rules
+├── nuxt.config.ts        # Nuxt configuration
+├── package.json          # Dependencies
+├── CLAUDE.md             # Claude Code instructions
+└── README.md             # This file
+```
+
+## Season System
+
+### How Seasons Work
+
+The application uses a multi-season system where:
+- **Only one season is active at a time** (marked with `isActive: true`)
+- Players must **register for each season** to participate
+- **Player statistics are tracked separately per season** in the `playerSeasons` collection
+- All games and decks are associated with a specific season via `seasonId`
+- Past seasons remain viewable but cannot accept new registrations
+
+### Firestore Collections
+
+The application uses six main Firestore collections:
+
+1. **users** - User accounts
+   ```
+   - id: string (userId from Firebase Auth)
    - displayName: string
    - email: string
    - createdAt: timestamp
    ```
 
-2. **players**
+2. **players** - Player profiles (no stats stored here)
    ```
    - id: string (auto-generated)
    - userId: string (reference to users)
    - displayName: string
-   - wins: number
-   - games: number
-   - points: number
    - createdAt: timestamp
    ```
 
-3. **decks**
+3. **playerSeasons** - Per-season player statistics
    ```
    - id: string (auto-generated)
+   - playerId: string (reference to players)
+   - seasonId: string (reference to seasons)
+   - displayName: string
+   - points: number
+   - wins: number
+   - losses: number
+   - gamesPlayed: number
+   - registeredAt: timestamp
+   ```
+
+4. **seasons** - Season definitions
+   ```
+   - id: string (e.g., "season-1")
+   - name: string
+   - slug: string
+   - startDate: timestamp
+   - endDate: timestamp | null
+   - isActive: boolean
+   - description: string
+   ```
+
+5. **decks** - Deck registrations
+   ```
+   - id: string (auto-generated)
+   - seasonId: string (reference to seasons)
    - name: string
    - commander: string
    - colors: array of strings
@@ -118,11 +246,12 @@ Create the following collections in Firestore:
    - createdAt: timestamp
    ```
 
-4. **games**
+6. **games** - Game results
    ```
    - id: string (auto-generated)
+   - seasonId: string (reference to seasons)
    - date: string (ISO format)
-   - players: array of objects
+   - players: array of GamePlayer objects
    - winnerId: string
    - placements: array
    - notes: string
@@ -130,13 +259,26 @@ Create the following collections in Firestore:
    - createdAt: timestamp
    ```
 
-### 6. Run Development Server
+## Database Migration
+
+If you have an existing database without seasons support, use the migration script:
 
 ```bash
-npm run dev
+# Install Firebase Admin SDK
+npm install firebase-admin --save-dev
+
+# Download service account key from Firebase Console
+# Project Settings > Service Accounts > Generate New Private Key
+# Save as scripts/serviceAccountKey.json
+
+# Set environment variable
+export GOOGLE_APPLICATION_CREDENTIALS="./scripts/serviceAccountKey.json"
+
+# Run migration
+node scripts/migrate-to-seasons.js
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+See `scripts/README.md` for detailed migration instructions.
 
 ## Deployment
 
@@ -189,34 +331,6 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
    firebase deploy --only hosting
    ```
 
-## Project Structure
-
-```
-mtg-commander-league/
-├── assets/           # CSS and static assets
-├── components/       # Vue components
-├── composables/      # Composable functions (useAuth, useFirestore)
-├── layouts/          # Layout components
-├── pages/            # Route pages
-│   ├── index.vue            # Home page
-│   ├── leaderboard.vue      # Leaderboard
-│   ├── decks.vue            # Deck listing
-│   ├── rules.vue            # League rules
-│   ├── submit-game.vue      # Game submission form
-│   └── auth/
-│       ├── login.vue        # Login page
-│       └── register.vue     # Registration page
-├── plugins/          # Nuxt plugins (Firebase initialization)
-├── public/           # Public static files
-├── server/           # Server API routes (optional)
-├── .env              # Environment variables (not in git)
-├── .env.example      # Environment variables template
-├── app.vue           # Root component
-├── nuxt.config.ts    # Nuxt configuration
-├── package.json      # Dependencies
-└── README.md         # This file
-```
-
 ## Customization
 
 ### Modifying League Rules
@@ -231,46 +345,13 @@ Update the scoring logic in:
 
 ### Styling
 
-- Global styles: `assets/css/main.css`
-- Nuxt UI theme: Configure in `nuxt.config.ts`
-- Component styles: Use Tailwind CSS classes
-
-## Firebase Security Rules
-
-Here are recommended Firestore security rules:
-
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Users can read all documents but only write their own
-    match /users/{userId} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Anyone can read players and decks
-    match /players/{playerId} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-
-    match /decks/{deckId} {
-      allow read: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null &&
-        resource.data.ownerId == request.auth.uid;
-    }
-
-    // Anyone can read games, authenticated users can submit
-    match /games/{gameId} {
-      allow read: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null;
-    }
-  }
-}
-```
+- **Global styles**: `assets/css/main.css`
+- **Theme colors**: `tailwind.config.ts`
+- **Component styles**: Use Tailwind CSS classes with the custom MTG color palette
+  - Lorwyn Gold: `lorwyn-gold-*`
+  - Shadowmoor Purple: `shadowmoor-purple-*`
+  - Shadowmoor Magenta: `shadowmoor-magenta-*`
+  - Twilight Blue: `twilight-blue-*`
 
 ## Cost Optimization
 
@@ -285,12 +366,61 @@ service cloud.firestore {
 1. Implement client-side caching
 2. Use Firestore queries efficiently
 3. Paginate large lists
-4. Monitor usage in Firebase Console
+4. Use client-side sorting for small datasets
+5. Monitor usage in Firebase Console
 
 **Vercel Free Tier**:
 - 100GB bandwidth/month
 - Unlimited deployments
 - Custom domains
+
+## Firebase Security Rules
+
+The `firestore.rules` file contains comprehensive security rules:
+
+- **Seasons**: Public read, authenticated write (admin only)
+- **PlayerSeasons**: Public read, owner-only write
+- **Players**: Public read, authenticated write (owner validation)
+- **Users**: Owner-only read/write
+- **Games**: Public read, authenticated write
+- **Decks**: Public read, owner-only write
+
+Deploy rules with:
+```bash
+firebase deploy --only firestore:rules
+```
+
+## Development
+
+### Creating a New Season
+
+1. Access Firestore Console
+2. Go to `seasons` collection
+3. Set current active season's `isActive` to `false`
+4. Add new season document with:
+   - `name`: Season name
+   - `slug`: URL-friendly slug
+   - `startDate`: Start timestamp
+   - `endDate`: null (or end timestamp if completed)
+   - `isActive`: true
+   - `description`: Season description
+
+### Player Registration Flow
+
+1. User signs in/registers
+2. User navigates to `/seasons`
+3. If not registered for active season, clicks "Register for Season"
+4. System creates `PlayerSeason` document with initial stats
+5. Player's games now count toward that season's stats
+
+### Submitting Games
+
+1. User must be authenticated
+2. Navigate to `/submit-game`
+3. Select players and decks
+4. Specify placements and winner
+5. Game is created with active `seasonId`
+6. Player stats in `playerSeasons` are updated
 
 ## Contributing
 
@@ -308,19 +438,24 @@ MIT License - feel free to use this project for your own league!
 For issues or questions:
 - Create an issue on GitHub
 - Contact the league organizer
+- Check the documentation in `CLAUDE.md`
 
 ## Roadmap
 
 Future features to implement:
-- [ ] Deck builder with card search
-- [ ] Advanced statistics and analytics
-- [ ] Season management
-- [ ] Player profiles
-- [ ] Match scheduling
+- [ ] Deck builder with card search integration
+- [ ] Advanced statistics and analytics dashboards
+- [ ] Automatic season rollover
+- [ ] Player achievement badges
+- [ ] Match scheduling system
 - [ ] Tournament brackets
 - [ ] Mobile app (React Native/Ionic)
 - [ ] Export data to CSV/PDF
+- [ ] Admin dashboard for season management
+- [ ] Discord/Slack integration for notifications
 
 ---
 
-Built with ❤️ for the Commander community
+Built with ❤️ for the Commander community by Budget Ducks
+
+**Powered by Nuxt 3, Firebase, and Nuxt UI**

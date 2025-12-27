@@ -1,19 +1,26 @@
 // Type definitions for MTG Commander League
 
+export interface User {
+  id: string
+  email: string
+  displayName: string
+  isAdmin: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Player {
   id: string
   userId?: string
   displayName: string
   email?: string
-  wins: number
-  games: number
-  points: number
   createdAt: string
   updatedAt?: string
 }
 
 export interface Deck {
   id: string
+  seasonId: string
   name: string
   commander: string
   colors: string[]
@@ -30,6 +37,7 @@ export interface Deck {
 
 export interface Game {
   id: string
+  seasonId: string
   date: string
   players: GamePlayer[]
   winnerId: string
@@ -60,10 +68,27 @@ export interface LeaderboardEntry {
 export interface Season {
   id: string
   name: string
+  slug: string
   startDate: string
-  endDate: string
+  endDate: string | null
   isActive: boolean
   description?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PlayerSeason {
+  id: string
+  playerId: string
+  seasonId: string
+  displayName: string
+  points: number
+  wins: number
+  losses: number
+  gamesPlayed: number
+  registeredAt: string
+  createdAt: string
+  updatedAt: string
 }
 
 export type MTGColor = 'white' | 'blue' | 'black' | 'red' | 'green' | 'colorless'

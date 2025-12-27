@@ -7,7 +7,7 @@
           <span class="icon">⚔️</span>
         </div>
         <h1 class="title">Submit Game Result</h1>
-        <p class="subtitle">Record your Budget Ducks Commander League match</p>
+        <p class="subtitle">{{ currentSeasonName }}</p>
       </div>
 
       <!-- Not Signed In State -->
@@ -26,13 +26,28 @@
 
       <!-- Submit Game Form -->
       <UCard v-else class="submit-game-card">
-        <!-- No Players Warning -->
-        <div v-if="availablePlayers.length === 0" class="no-players-warning">
-          <div class="warning-icon">⚠️</div>
-          <h3 class="warning-title">No Players Found</h3>
+        <!-- No Active Season Warning -->
+        <div v-if="!activeSeason" class="no-players-warning">
+          <div class="warning-icon">📅</div>
+          <h3 class="warning-title">No Active Season</h3>
           <p class="warning-text">
-            No player profiles are available in the database. Players need to be registered before you can submit game results.
+            There is no active season at the moment. Please contact the league administrator.
           </p>
+          <UButton to="/seasons" variant="outline" size="lg" class="mt-4">
+            View All Seasons
+          </UButton>
+        </div>
+
+        <!-- No Players Warning -->
+        <div v-else-if="availablePlayers.length === 0" class="no-players-warning">
+          <div class="warning-icon">⚠️</div>
+          <h3 class="warning-title">No Registered Players</h3>
+          <p class="warning-text">
+            No players are registered for {{ activeSeason.name }}. Players need to register for the season before you can submit game results.
+          </p>
+          <UButton to="/seasons/register" variant="outline" size="lg" class="mt-4">
+            Register for Season
+          </UButton>
         </div>
 
         <UForm v-else :state="formState" :validate="validate" class="space-y-8" @submit="handleSubmit">
@@ -63,7 +78,8 @@
                   <UFormField label="Player" :name="`players[${index}].playerId`" class="flex-1">
                     <USelect
                       v-model="formState.players[index].playerId"
-                      :options="availablePlayers"
+                      :items="availablePlayers"
+                      value-key="value"
                       placeholder="Select Player"
                       size="xl"
                       class="w-full"
@@ -73,7 +89,8 @@
                   <UFormField label="Deck" :name="`players[${index}].deckId`" class="flex-1">
                     <USelect
                       v-model="formState.players[index].deckId"
-                      :options="getPlayerDecks(formState.players[index].playerId)"
+                      :items="getPlayerDecks(formState.players[index].playerId)"
+                      value-key="value"
                       placeholder="Select Deck"
                       size="xl"
                       class="w-full"
@@ -109,7 +126,8 @@
           <UFormField label="Winner" name="winnerId" required>
             <USelect
               v-model="formState.winnerId"
-              :options="playerOptions"
+              :items="playerOptions"
+              value-key="value"
               placeholder="Select Winner"
               size="xl"
               icon="i-heroicons-trophy"
@@ -134,7 +152,8 @@
                   <span class="placement-number">{{ index + 1 }}{{ getPlacementSuffix(index + 1) }}</span>
                   <USelect
                     v-model="formState.placements[index]"
-                    :options="playerOptions"
+                    :items="playerOptions"
+                    value-key="value"
                     :placeholder="`Select ${getPlacementOrdinal(index + 1)} place`"
                     size="lg"
                     class="flex-1"
@@ -204,11 +223,16 @@
 </template>
 
 <script setup lang="ts">
+import type { Season } from '~/types'
+
 const { user } = useAuth()
-const { getDocuments, addDocument, updateDocument, increment } = useFirestore()
+const { getDocuments, addDocument, updateDocument, increment, where } = useFirestore()
+const { getActiveSeason, getRegisteredPlayers, updatePlayerStats } = useSeasons()
 const toast = useToast()
 
 const isSubmitting = ref(false)
+const activeSeason = ref<Season | null>(null)
+const currentSeasonName = ref('Loading...')
 
 const formState = reactive({
   date: new Date().toISOString().split('T')[0],
@@ -310,11 +334,21 @@ const getPlacementOrdinal = (place: number) => {
 }
 
 const handleSubmit = async () => {
+  if (!activeSeason.value) {
+    toast.add({
+      title: 'No Active Season',
+      description: 'Cannot submit game without an active season.',
+      color: 'error'
+    })
+    return
+  }
+
   isSubmitting.value = true
 
   try {
-    // Submit game to Firestore
+    // Submit game to Firestore with seasonId
     await addDocument('games', {
+      seasonId: activeSeason.value.id,
       date: formState.date,
       players: formState.players,
       winnerId: formState.winnerId,
@@ -323,17 +357,21 @@ const handleSubmit = async () => {
       turnCount: formState.turnCount
     })
 
-    // Update player stats
+    // Update playerSeason stats (not player stats)
     for (const gamePlayer of formState.players) {
       const isWinner = gamePlayer.playerId === formState.winnerId
 
-      // Update player document
-      await updateDocument('players', gamePlayer.playerId, {
-        gamesPlayed: increment(1),
-        wins: isWinner ? increment(1) : increment(0),
-        losses: !isWinner ? increment(1) : increment(0),
-        points: increment(isWinner ? 3 : 1) // 3 points for win, 1 for participation
-      })
+      // Update playerSeason stats
+      await updatePlayerStats(
+        gamePlayer.playerId,
+        activeSeason.value.id,
+        {
+          gamesPlayed: increment(1) as any,
+          wins: isWinner ? increment(1) as any : increment(0) as any,
+          losses: !isWinner ? increment(1) as any : increment(0) as any,
+          points: increment(isWinner ? 3 : 1) as any // 3 points for win, 1 for participation
+        }
+      )
 
       // Update deck stats
       if (gamePlayer.deckId) {
@@ -380,15 +418,28 @@ const resetForm = () => {
 
 onMounted(async () => {
   try {
-    // Fetch players from Firestore
-    const players = await getDocuments('players')
-    availablePlayers.value = players.map((player: any) => ({
-      value: player.id,
-      label: player.displayName
+    // Get active season
+    const season = await getActiveSeason()
+    activeSeason.value = season
+
+    if (!season) {
+      currentSeasonName.value = 'No Active Season'
+      return
+    }
+
+    currentSeasonName.value = season.name
+
+    // Fetch players registered for the current season
+    const registeredPlayers = await getRegisteredPlayers(season.id)
+    availablePlayers.value = registeredPlayers.map((playerSeason: any) => ({
+      value: playerSeason.playerId,
+      label: playerSeason.displayName
     }))
 
-    // Fetch decks from Firestore
-    const decks = await getDocuments('decks')
+    // Fetch decks for the current season only
+    const decks = await getDocuments('decks', [
+      where('seasonId', '==', season.id)
+    ])
     availableDecks.value = decks.map((deck: any) => ({
       value: deck.id,
       label: `${deck.name} (${deck.commander})`,
@@ -396,9 +447,10 @@ onMounted(async () => {
     }))
   } catch (error) {
     console.error('Error fetching data:', error)
+    currentSeasonName.value = 'Error loading season'
     toast.add({
       title: 'Error Loading Data',
-      description: 'Unable to load players and decks. Please refresh the page.',
+      description: 'Unable to load season data. Please refresh the page.',
       color: 'error'
     })
   }

@@ -9,7 +9,7 @@
           </div>
           <div>
             <h1 class="hero-title">Commander Decks</h1>
-            <p class="hero-subtitle">Browse and manage your budget commander decks</p>
+            <p class="hero-subtitle">{{ currentSeasonName }}</p>
           </div>
         </div>
         <UButton
@@ -32,15 +32,17 @@
             class="min-w-[250px]" />
           <USelect v-model="selectedColor" :options="colorFilters" placeholder="Filter by Color"
             class="min-w-[180px]" />
+          <USelect
+            v-model="selectedSeasonId"
+            :items="seasonOptions"
+            value-key="value"
+            placeholder="Filter by Season"
+            class="min-w-[200px]"
+          />
         </div>
-        <div class="flex gap-2">
-          <UButton variant="outline" @click="toggleTestData">
-            {{ useTestData ? 'Use Real Data' : 'Use Test Data' }}
-          </UButton>
-          <UButton variant="outline" @click="refreshDecks" icon="i-heroicons-arrow-path">
-            Refresh
-          </UButton>
-        </div>
+        <UButton variant="outline" @click="refreshDecks" icon="i-heroicons-arrow-path">
+          Refresh
+        </UButton>
       </div>
     </UCard>
 
@@ -101,6 +103,11 @@
               <div class="overlay-stat-item">
                 <span class="stat-label-text">Owner</span>
                 <span class="stat-value-text">{{ deck.owner }}</span>
+              </div>
+
+              <!-- Season Badge -->
+              <div v-if="deck.seasonName" class="season-badge-overlay">
+                {{ deck.seasonName }}
               </div>
             </div>
           </div>
@@ -180,15 +187,21 @@
 </template>
 
 <script setup lang="ts">
+import type { Season } from '~/types'
+
 const { user } = useAuth()
-const { getDocuments, addDocument } = useFirestore()
+const { getDocuments, addDocument, where } = useFirestore()
+const { getAllSeasons, getActiveSeason } = useSeasons()
 const { fetchCommanderImage, searchCommanders } = useScryfall()
 
 const searchQuery = ref('')
 const selectedColor = ref('all')
+const selectedSeasonId = ref('all')
 const showAddDeckModal = ref(false)
 const isSubmitting = ref(false)
-const useTestData = ref(true) // Start with test data
+const allSeasons = ref<Season[]>([])
+const activeSeason = ref<Season | null>(null)
+const currentSeasonName = ref('Loading...')
 
 // Commander autocomplete
 const commanderSuggestions = ref<Array<{ label: string; value: string }>>([])
@@ -202,21 +215,18 @@ const loadingImages = ref<Record<string, boolean>>({})
 
 const colorFilters = ['all', 'white', 'blue', 'black', 'red', 'green', 'colorless']
 
-// Mock test data with real MTG commanders
-const mockDecks = [
-  { id: '1', name: 'Elf Tribal', commander: 'Lathril, Blade of the Elves', colors: ['green', 'black'], budget: 45, owner: 'Alex', wins: 12, games: 20, decklistUrl: 'https://www.moxfield.com/decks/elf-tribal-example' },
-  { id: '2', name: 'Dragon Storm', commander: 'The Ur-Dragon', colors: ['white', 'blue', 'black', 'red', 'green'], budget: 75, owner: 'Jordan', wins: 8, games: 15, decklistUrl: 'https://www.moxfield.com/decks/dragon-storm-example' },
-  { id: '3', name: 'Vampire Knights', commander: 'Edgar Markov', colors: ['white', 'black', 'red'], budget: 60, owner: 'Sam', wins: 15, games: 22, decklistUrl: 'https://www.moxfield.com/decks/vampire-knights-example' },
-  { id: '4', name: 'Wizard Control', commander: 'Niv-Mizzet, Parun', colors: ['blue', 'red'], budget: 50, owner: 'Taylor', wins: 10, games: 18, decklistUrl: 'https://www.moxfield.com/decks/wizard-control-example' },
-  { id: '5', name: 'Zombie Horde', commander: 'The Scarab God', colors: ['blue', 'black'], budget: 55, owner: 'Morgan', wins: 14, games: 21, decklistUrl: 'https://www.moxfield.com/decks/zombie-horde-example' },
-  { id: '6', name: 'Angels Rising', commander: 'Giada, Font of Hope', colors: ['white'], budget: 40, owner: 'Casey', wins: 9, games: 16, decklistUrl: 'https://www.moxfield.com/decks/angels-rising-example' },
-  { id: '7', name: 'Goblin Mayhem', commander: 'Krenko, Mob Boss', colors: ['red'], budget: 35, owner: 'Riley', wins: 11, games: 19, decklistUrl: 'https://www.moxfield.com/decks/goblin-mayhem-example' },
-  { id: '8', name: 'Merfolk Tide', commander: 'Kumena, Tyrant of Orazca', colors: ['green', 'blue'], budget: 48, owner: 'Avery', wins: 7, games: 14, decklistUrl: 'https://www.moxfield.com/decks/merfolk-tide-example' },
-  { id: '9', name: 'Cat Tribal', commander: 'Arahbo, Roar of the World', colors: ['green', 'white'], budget: 42, owner: 'Drew', wins: 13, games: 20, decklistUrl: 'https://www.moxfield.com/decks/cat-tribal-example' },
-  { id: '10', name: 'Artifact Combo', commander: 'Urza, Lord High Artificer', colors: ['blue'], budget: 70, owner: 'Quinn', wins: 16, games: 23, decklistUrl: 'https://www.moxfield.com/decks/artifact-combo-example' },
-  { id: '11', name: 'Dinosaur Stampede', commander: 'Gishath, Sun\'s Avatar', colors: ['red', 'green', 'white'], budget: 58, owner: 'Skyler', wins: 6, games: 12, decklistUrl: 'https://www.moxfield.com/decks/dinosaur-stampede-example' },
-  { id: '12', name: 'Sliver Swarm', commander: 'The First Sliver', colors: ['white', 'blue', 'black', 'red', 'green'], budget: 65, owner: 'Jamie', wins: 10, games: 17, decklistUrl: 'https://www.moxfield.com/decks/sliver-swarm-example' }
-]
+// Computed: Season options for dropdown
+const seasonOptions = computed(() => {
+  const options = [
+    { label: 'All Seasons', value: 'all' },
+    ...allSeasons.value.map((season: Season) => ({
+      label: season.isActive ? `${season.name} (Active)` : season.name,
+      value: season.id
+    }))
+  ]
+  console.log('[Decks] Season options:', options)
+  return options
+})
 
 const availableColors = [
   { label: 'White (W)', value: 'white' },
@@ -324,6 +334,12 @@ const filteredDecks = computed(() => {
     )
   }
 
+  if (selectedSeasonId.value !== 'all') {
+    result = result.filter(deck =>
+      deck.seasonId === selectedSeasonId.value
+    )
+  }
+
   return result
 })
 
@@ -362,35 +378,41 @@ const viewDeck = (deck: any) => {
   }
 }
 
-const loadTestData = async () => {
-  decks.value = [...mockDecks]
-  await loadCommanderImages(mockDecks)
-}
-
-const toggleTestData = () => {
-  useTestData.value = !useTestData.value
-  refreshDecks()
-}
-
 const refreshDecks = async () => {
-  if (useTestData.value) {
-    await loadTestData()
-  } else {
-    await fetchDecks()
-  }
+  await fetchDecks()
 }
 
 const fetchDecks = async () => {
   try {
     const fetchedDecks = await getDocuments('decks')
-    decks.value = fetchedDecks
+
+    // Add season names to decks
+    const decksWithSeasonNames = fetchedDecks.map((deck: any) => {
+      const season = allSeasons.value.find((s: Season) => s.id === deck.seasonId)
+      return {
+        ...deck,
+        seasonName: season ? season.name : 'Unknown Season'
+      }
+    })
+
+    decks.value = decksWithSeasonNames
 
     // Fetch commander images for all decks
-    await loadCommanderImages(fetchedDecks)
+    await loadCommanderImages(decksWithSeasonNames)
   } catch (error) {
     console.error('Error fetching decks:', error)
   }
 }
+
+// Watch for season selection changes
+watch(selectedSeasonId, (newSeasonId) => {
+  const season = allSeasons.value.find((s: Season) => s.id === newSeasonId)
+  if (season) {
+    currentSeasonName.value = season.name
+  } else if (newSeasonId === 'all') {
+    currentSeasonName.value = 'All Seasons'
+  }
+})
 
 const loadCommanderImages = async (decksList: any[]) => {
   for (const deck of decksList) {
@@ -431,6 +453,15 @@ const handleAddDeck = async () => {
     return
   }
 
+  if (!activeSeason.value) {
+    toast.add({
+      title: 'No Active Season',
+      description: 'Cannot add deck without an active season',
+      color: 'error'
+    })
+    return
+  }
+
   // Validate form
   const errors = validateDeck(deckForm)
   if (errors.length > 0) {
@@ -464,8 +495,9 @@ const handleAddDeck = async () => {
     const playerDoc = playerSnapshot.docs[0]
     const playerId = playerDoc.id
 
-    // Add deck to Firestore
+    // Add deck to Firestore with seasonId
     await addDocument('decks', {
+      seasonId: activeSeason.value.id,
       name: deckForm.name,
       commander: deckForm.commander,
       colors: deckForm.colors,
@@ -503,11 +535,29 @@ const handleAddDeck = async () => {
   }
 }
 
-onMounted(() => {
-  if (useTestData.value) {
-    loadTestData()
-  } else {
-    fetchDecks()
+onMounted(async () => {
+  try {
+    // Load all seasons
+    const seasons = await getAllSeasons()
+    allSeasons.value = seasons
+
+    // Get active season
+    const active = await getActiveSeason()
+    activeSeason.value = active
+
+    if (active) {
+      selectedSeasonId.value = active.id
+      currentSeasonName.value = active.name
+    } else if (seasons.length > 0) {
+      selectedSeasonId.value = 'all'
+      currentSeasonName.value = 'All Seasons'
+    }
+
+    // Load decks
+    await fetchDecks()
+  } catch (error) {
+    console.error('Error loading data:', error)
+    currentSeasonName.value = 'Error loading seasons'
   }
 })
 </script>
@@ -677,6 +727,10 @@ onMounted(() => {
 
 .stat-value-text {
   @apply text-base md:text-lg text-white font-black;
+}
+
+.season-badge-overlay {
+  @apply mt-2 px-3 py-1 rounded-full bg-lorwyn-gold-500/20 border border-lorwyn-gold-500/40 text-lorwyn-gold-400 text-xs font-bold uppercase tracking-wider inline-block;
 }
 
 /* ================= EMPTY STATE ================= */

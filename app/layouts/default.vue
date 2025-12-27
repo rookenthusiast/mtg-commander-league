@@ -31,6 +31,10 @@
               class="text-twilight-blue-200 hover:text-white hover:bg-shadowmoor-purple-800 font-semibold">
               Leaderboard
             </UButton>
+            <UButton to="/seasons" variant="ghost"
+              class="text-twilight-blue-200 hover:text-white hover:bg-shadowmoor-purple-800 font-semibold">
+              Seasons
+            </UButton>
             <UButton to="/decks" variant="ghost"
               class="text-twilight-blue-200 hover:text-white hover:bg-shadowmoor-purple-800 font-semibold">
               Decks
@@ -53,6 +57,11 @@
           <!-- Auth buttons -->
           <div class="hidden md:flex items-center space-x-2">
             <template v-if="user">
+              <UButton v-if="isAdmin" to="/admin" variant="ghost"
+                class="text-lorwyn-gold-400 hover:text-lorwyn-gold-300 hover:bg-shadowmoor-purple-800 font-semibold"
+                icon="i-heroicons-shield-check">
+                Admin
+              </UButton>
               <UButton to="/setup-profile" variant="ghost"
                 class="text-twilight-blue-200 hover:text-white hover:bg-shadowmoor-purple-800 font-semibold">
                 Profile
@@ -83,6 +92,10 @@
             class="text-twilight-blue-200 hover:text-white hover:bg-shadowmoor-purple-800 w-full justify-start" block>
             Leaderboard
           </UButton>
+          <UButton to="/seasons" variant="ghost"
+            class="text-twilight-blue-200 hover:text-white hover:bg-shadowmoor-purple-800 w-full justify-start" block>
+            Seasons
+          </UButton>
           <UButton to="/decks" variant="ghost"
             class="text-twilight-blue-200 hover:text-white hover:bg-shadowmoor-purple-800 w-full justify-start" block>
             Decks
@@ -97,6 +110,11 @@
           </UButton>
 
           <template v-if="user">
+            <UButton v-if="isAdmin" to="/admin" variant="ghost"
+              class="text-lorwyn-gold-400 hover:text-lorwyn-gold-300 hover:bg-shadowmoor-purple-800 w-full justify-start"
+              icon="i-heroicons-shield-check" block>
+              Admin
+            </UButton>
             <UButton to="/setup-profile" variant="ghost"
               class="text-twilight-blue-200 hover:text-white hover:bg-shadowmoor-purple-800 w-full justify-start" block>
               Profile
@@ -163,6 +181,14 @@
 <script setup lang="ts">
 const isMobileMenuOpen = ref(false)
 const { user, signOut } = useAuth()
+const { isAdmin, checkAdminStatus } = useAdmin()
+
+// Check admin status when user changes
+watch(user, async (newUser) => {
+  if (newUser) {
+    await checkAdminStatus()
+  }
+}, { immediate: true })
 
 const handleSignOut = async () => {
   await signOut()
