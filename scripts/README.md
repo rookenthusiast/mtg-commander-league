@@ -101,6 +101,106 @@ You should see output like:
 
 ---
 
+## fix-stranded-users.js
+
+This script identifies and fixes users who are authenticated in Firebase Auth but are missing corresponding documents in Firestore. This can happen when user registration partially fails (auth succeeds but database writes fail).
+
+### Prerequisites
+
+Same as above - you need Firebase Admin SDK and the service account key.
+
+### Running the Script
+
+**Preview what will be fixed (recommended first step):**
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS="./scripts/serviceAccountKey.json"
+node scripts/fix-stranded-users.js --dry-run
+```
+
+**Fix all stranded users:**
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS="./scripts/serviceAccountKey.json"
+node scripts/fix-stranded-users.js
+```
+
+**Fix a specific user by UID:**
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS="./scripts/serviceAccountKey.json"
+node scripts/fix-stranded-users.js --user-id=abc123xyz
+```
+
+### What This Script Does
+
+1. ✅ Fetches all authenticated users from Firebase Auth
+2. ✅ Checks each user for missing `users` and `players` documents
+3. ✅ Creates missing documents with proper data structure
+4. ✅ Preserves original creation timestamps from auth metadata
+5. ✅ Provides detailed logging of all operations
+
+### When to Use This Script
+
+Run this script if:
+- A user reports they can't access their profile after signing up
+- Authentication succeeded but database writes failed
+- Users are authenticated but don't appear in admin dashboards
+- After fixing a bug in the registration flow (like the one we just fixed!)
+
+### Expected Output
+
+```
+🔍 Fix Stranded Users Utility
+================================
+
+📋 Fetching all authenticated users...
+
+Found 5 authenticated users
+
+👤 Checking user: john@example.com (John Doe)
+   UID: abc123xyz
+   ⚠️  Missing user document
+   ⚠️  Missing player document
+   🔧 Fixing user and player document(s)...
+   ✓ Created user document for john@example.com
+   ✓ Created player document for john@example.com
+
+👤 Checking user: jane@example.com (Jane Smith)
+   UID: def456uvw
+   ✓ User document exists
+   ✓ Player document exists
+   ✓ No issues found
+
+================================
+📊 Summary:
+   Checked: 5 user(s)
+   Fixed: 1 stranded user(s)
+
+✅ Stranded users have been fixed!
+
+✓ Script completed successfully
+```
+
+### Command Line Options
+
+- `--dry-run` - Preview changes without making any modifications
+- `--user-id=<UID>` - Fix only a specific user instead of all users
+
+### Safety Features
+
+- ✅ Dry-run mode to preview changes first
+- ✅ Preserves original account creation timestamps
+- ✅ Idempotent - safe to run multiple times
+- ✅ Detailed logging for audit trail
+- ✅ Can target specific users for surgical fixes
+
+### Important Notes
+
+- This script only creates missing documents; it doesn't modify existing ones
+- User data (email, display name) is pulled from Firebase Auth metadata
+- Safe to run anytime you suspect there are stranded users
+- Run with `--dry-run` first to see what would be fixed
+
+---
+
 ## set-admin.js
 
 This script sets a user as an administrator. Run this to grant admin privileges to your initial admin user.

@@ -70,10 +70,7 @@ export const useAuth = () => {
         await addDocument("players", {
           userId,
           displayName,
-          gamesPlayed: 0,
-          wins: 0,
-          losses: 0,
-          points: 0,
+          email,
         });
       }
 
@@ -117,10 +114,7 @@ export const useAuth = () => {
           await addDocument("players", {
             userId,
             displayName,
-            gamesPlayed: 0,
-            wins: 0,
-            losses: 0,
-            points: 0,
+            email,
           });
         }
       }

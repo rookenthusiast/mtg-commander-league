@@ -17,12 +17,14 @@ service cloud.firestore {
     // PlayerSeasons - read all, write only for authenticated users
     match /playerSeasons/{playerSeasonId} {
       allow read: if true;
+      // Allow authenticated users to create playerSeason documents
+      // Verify ownership by checking if the player document's userId matches auth.uid
       allow create: if request.auth != null
-        && request.resource.data.playerId == request.auth.uid;
+        && get(/databases/$(database)/documents/players/$(request.resource.data.playerId)).data.userId == request.auth.uid;
       allow update: if request.auth != null
-        && resource.data.playerId == request.auth.uid;
+        && get(/databases/$(database)/documents/players/$(resource.data.playerId)).data.userId == request.auth.uid;
       // Users can delete their own, admins can delete any
-      allow delete: if (request.auth != null && resource.data.playerId == request.auth.uid) || isAdmin();
+      allow delete: if (request.auth != null && get(/databases/$(database)/documents/players/$(resource.data.playerId)).data.userId == request.auth.uid) || isAdmin();
     }
 
     // Players - read all, write restricted
