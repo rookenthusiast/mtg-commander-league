@@ -110,6 +110,8 @@
 </script>
 
 <style scoped>
+@reference "~/assets/css/main.css";
+
 .prose a {
   color: rgb(var(--color-primary-500));
   text-decoration: underline;

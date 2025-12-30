@@ -51,7 +51,9 @@
       <h2 class="section-title">All Decks</h2>
 
       <div class="decks-grid">
-        <div v-for="deck in filteredDecks" :key="deck.id" class="deck-card" @click="viewDeck(deck)">
+        <div v-for="deck in filteredDecks" :key="deck.id" class="deck-card"
+          @click="handleDeckClick(deck.id)"
+          :class="{ 'active': activeDeckId === deck.id }">
           <!-- Card Art Background -->
           <div class="card-art-wrapper">
             <!-- Loading State -->
@@ -74,8 +76,8 @@
 
           <!-- Card Content Overlay -->
           <div class="card-overlay-content">
-            <!-- Deck Info Stack -->
-            <div class="card-info-stack">
+            <!-- Deck Info Stack (hidden when active) -->
+            <div v-if="activeDeckId !== deck.id" class="card-info-stack">
               <h3 class="overlay-deck-name">{{ deck.name }}</h3>
               <p class="overlay-commander-name">{{ deck.commander }}</p>
 
@@ -110,6 +112,34 @@
                 {{ deck.seasonName }}
               </div>
             </div>
+
+            <!-- Action Buttons (centered when active) -->
+            <div v-if="activeDeckId === deck.id" class="deck-actions-center">
+              <div class="action-buttons">
+                <UButton v-if="canEditDeck(deck)" icon="i-heroicons-pencil" size="lg" variant="solid"
+                  @click.stop="openEditModal(deck)" class="action-button">
+                  Edit
+                </UButton>
+                <UButton v-if="deck.decklistUrl" icon="i-heroicons-arrow-top-right-on-square" size="lg"
+                  variant="solid" @click.stop="viewDeck(deck)" class="action-button">
+                  View List
+                </UButton>
+                <UButton v-if="canEditDeck(deck)" icon="i-heroicons-trash" size="lg" color="error"
+                  @click.stop="openDeleteModal(deck)" class="action-button">
+                  Delete
+                </UButton>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mobile Actions (always visible on mobile) -->
+          <div class="deck-actions-mobile">
+            <UButton v-if="deck.decklistUrl" icon="i-heroicons-arrow-top-right-on-square" size="md"
+              variant="solid" @click.stop="viewDeck(deck)" class="mobile-action-btn" />
+            <UButton v-if="canEditDeck(deck)" icon="i-heroicons-pencil" size="md" variant="solid"
+              @click.stop="openEditModal(deck)" class="mobile-action-btn" />
+            <UButton v-if="canEditDeck(deck)" icon="i-heroicons-trash" size="md" color="error"
+              @click.stop="openDeleteModal(deck)" class="mobile-action-btn" />
           </div>
         </div>
       </div>
@@ -135,79 +165,62 @@
     </UCard>
 
     <!-- Add Deck Modal -->
-    <UModal v-model:open="showAddDeckModal" title="Add New Commander Deck"
-      description="Register a new deck for the Budget Ducks Commander League"
-      :ui="{ footer: 'flex justify-end gap-3' }">
-      <template #body>
-        <UForm :state="deckForm" :validate="validateDeck" class="space-y-6" @submit="handleAddDeck">
-          <UFormField label="Deck Name" name="name" required help="Give your deck a memorable name">
-            <UInput v-model="deckForm.name" placeholder="e.g., Dragon Storm, Elf Tribal" size="lg" class="w-full" />
-          </UFormField>
+    <DeckFormModal
+      v-model:is-open="showAddDeckModal"
+      mode="create"
+      :active-season="activeSeason"
+      @submit="handleAddDeck"
+    />
 
-          <UFormField label="Commander" name="commander" required
-            help="Type at least 3 letters to search for commanders">
-            <UInputMenu v-model="deckForm.commander" v-model:search-term="commanderSearchTerm"
-              :items="commanderSuggestions" :loading="isSearchingCommanders" value-key="value"
-              placeholder="e.g., Lathril, Blade of the Elves" size="lg" class="w-full" />
-          </UFormField>
+    <!-- Edit Deck Modal -->
+    <DeckFormModal
+      v-model:is-open="showEditDeckModal"
+      mode="edit"
+      :deck="editingDeck"
+      :active-season="activeSeason"
+      @submit="handleEditSubmit"
+    />
 
-          <UFormField label="Color Identity" name="colors" help="Select all colors in your commander's color identity">
-            <UCheckboxGroup v-model="deckForm.colors" :items="availableColors" class="w-full" />
-          </UFormField>
-
-          <UFormField label="Budget (USD)" name="budget" required help="Total deck cost excluding basic lands">
-            <UInputNumber v-model="deckForm.budget" :min="0" :step="0.01" placeholder="50.00" size="lg"
-              class="w-full" />
-          </UFormField>
-
-          <UFormField label="Deck Description" name="description"
-            help="Optional: Describe your deck's strategy and playstyle">
-            <UTextarea v-model="deckForm.description" placeholder="This deck focuses on..." :rows="3" resize
-              class="w-full" />
-          </UFormField>
-
-          <UFormField label="Decklist URL" name="decklistUrl"
-            help="Optional: Link to Moxfield, Archidekt, or other deck builder">
-            <UInput v-model="deckForm.decklistUrl" type="url" placeholder="https://www.moxfield.com/decks/..." size="lg"
-              class="w-full" />
-          </UFormField>
-        </UForm>
-      </template>
-
-      <template #footer>
-        <UButton variant="outline" color="neutral" @click="showAddDeckModal = false" :disabled="isSubmitting">
-          Cancel
-        </UButton>
-        <UButton @click="handleAddDeck" :loading="isSubmitting" class="add-deck-submit-button">
-          Add Deck
-        </UButton>
-      </template>
-    </UModal>
+    <!-- Delete Confirmation Modal -->
+    <DeleteConfirmationModal
+      v-model:is-open="showDeleteModal"
+      title="Delete Deck?"
+      :message="`Are you sure you want to delete &quot;${deckToDelete?.name}&quot;?`"
+      :is-loading="isDeleting"
+      @confirm="confirmDelete"
+      @cancel="showDeleteModal = false"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import type { Season } from '~/types'
+import type { Season, Deck } from '~/types'
 
 const { user } = useAuth()
-const { getDocuments, addDocument, where } = useFirestore()
+const { getDocuments, addDocument, updateDocument, deleteDocument, where } = useFirestore()
 const { getAllSeasons, getActiveSeason } = useSeasons()
-const { fetchCommanderImage, searchCommanders } = useScryfall()
+const { fetchCommanderImage } = useScryfall()
 
 const searchQuery = ref('')
 const selectedColor = ref('all')
 const selectedSeasonId = ref('all')
 const showAddDeckModal = ref(false)
-const isSubmitting = ref(false)
+const showEditDeckModal = ref(false)
+const showDeleteModal = ref(false)
 const allSeasons = ref<Season[]>([])
 const activeSeason = ref<Season | null>(null)
 const currentSeasonName = ref('Loading...')
 
-// Commander autocomplete
-const commanderSuggestions = ref<Array<{ label: string; value: string }>>([])
-const commanderSearchTerm = ref('')
-const isSearchingCommanders = ref(false)
-let searchTimeout: NodeJS.Timeout | null = null
+// Current player tracking
+const currentPlayerId = ref<string | null>(null)
+
+// Deck editing/deletion
+const editingDeck = ref<Deck | null>(null)
+const deckToDelete = ref<Deck | null>(null)
+const isDeleting = ref(false)
+
+// Active deck (for showing action buttons)
+const activeDeckId = ref<string | null>(null)
 
 // Store commander images (deck.id -> image URL)
 const commanderImages = ref<Record<string, string | null>>({})
@@ -227,94 +240,6 @@ const seasonOptions = computed(() => {
   console.log('[Decks] Season options:', options)
   return options
 })
-
-const availableColors = [
-  { label: 'White (W)', value: 'white' },
-  { label: 'Blue (U)', value: 'blue' },
-  { label: 'Black (B)', value: 'black' },
-  { label: 'Red (R)', value: 'red' },
-  { label: 'Green (G)', value: 'green' },
-  { label: 'Colorless (C)', value: 'colorless' }
-]
-
-const deckForm = reactive({
-  name: '',
-  commander: '',
-  colors: [] as string[],
-  budget: 0,
-  description: '',
-  decklistUrl: ''
-})
-
-// Debounced commander search
-const searchCommandersDebounced = async (query: string) => {
-  // Clear existing timeout
-  if (searchTimeout) {
-    clearTimeout(searchTimeout)
-  }
-
-  // Only search if query is 3+ characters
-  if (!query || query.trim().length < 3) {
-    commanderSuggestions.value = []
-    isSearchingCommanders.value = false
-    return
-  }
-
-  // Don't search if the query matches the already selected commander
-  if (query === deckForm.commander) {
-    isSearchingCommanders.value = false
-    return
-  }
-
-  // Set loading state
-  isSearchingCommanders.value = true
-
-  // Debounce the search
-  searchTimeout = setTimeout(async () => {
-    try {
-      const results = await searchCommanders(query)
-      commanderSuggestions.value = results
-    } catch (error) {
-      console.error('Error searching commanders:', error)
-      commanderSuggestions.value = []
-    } finally {
-      isSearchingCommanders.value = false
-    }
-  }, 300) // 300ms delay
-}
-
-// Watch for changes in commander search term
-watch(commanderSearchTerm, (newValue) => {
-  console.log('Commander search term changed to:', newValue)
-  searchCommandersDebounced(newValue)
-})
-
-// Validation function
-const validateDeck = (state: typeof deckForm) => {
-  const errors = []
-
-  if (!state.name || state.name.trim().length < 2) {
-    errors.push({ name: 'name', message: 'Deck name must be at least 2 characters' })
-  }
-
-  if (!state.commander || state.commander.trim().length < 2) {
-    errors.push({ name: 'commander', message: 'Commander name is required' })
-  }
-
-  if (state.budget === null || state.budget === undefined || state.budget < 0) {
-    errors.push({ name: 'budget', message: 'Budget must be a positive number' })
-  }
-
-  if (state.decklistUrl && state.decklistUrl.trim() !== '') {
-    try {
-      new URL(state.decklistUrl)
-    } catch {
-      errors.push({ name: 'decklistUrl', message: 'Please enter a valid URL' })
-    }
-  }
-
-  return errors
-}
 
 const decks = ref<any[]>([])
 
@@ -368,18 +293,132 @@ const getManaSymbolUrl = (color: string): string => {
   return `https://svgs.scryfall.io/card-symbols/${symbol}.svg`
 }
 
-const viewDeck = (deck: any) => {
-  // Open deck URL in new tab if available
-  if (deck.decklistUrl) {
-    window.open(deck.decklistUrl, '_blank', 'noopener,noreferrer')
+const handleDeckClick = (deckId: string) => {
+  // Only allow toggle on desktop (window width >= 768px)
+  if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+    toggleDeckActions(deckId)
+  }
+}
+
+const toggleDeckActions = (deckId: string) => {
+  if (activeDeckId.value === deckId) {
+    activeDeckId.value = null
   } else {
-    // Fallback: could open a modal or detail page
-    console.log('No decklist URL for deck:', deck)
+    activeDeckId.value = deckId
+  }
+}
+
+const viewDeck = (deck: any) => {
+  if (!deck.decklistUrl || deck.decklistUrl.trim() === '') {
+    toast.add({
+      title: 'No Decklist URL',
+      description: `${deck.name} doesn't have a decklist URL. ${canEditDeck(deck) ? 'Click the edit button to add one.' : 'Contact the deck owner to add one.'}`,
+      color: 'warning'
+    })
+    return
+  }
+
+  // Validate URL format
+  try {
+    new URL(deck.decklistUrl)
+    window.open(deck.decklistUrl, '_blank', 'noopener,noreferrer')
+  } catch {
+    toast.add({
+      title: 'Invalid URL',
+      description: `The decklist URL for ${deck.name} is invalid. ${canEditDeck(deck) ? 'Click the edit button to fix it.' : 'Contact the deck owner to fix it.'}`,
+      color: 'error'
+    })
   }
 }
 
 const refreshDecks = async () => {
   await fetchDecks()
+}
+
+// Ownership check
+const canEditDeck = (deck: any): boolean => {
+  return !!user.value && deck.ownerId === currentPlayerId.value
+}
+
+// Edit/Delete handlers
+const openEditModal = (deck: Deck) => {
+  editingDeck.value = deck
+  showEditDeckModal.value = true
+}
+
+const openDeleteModal = (deck: Deck) => {
+  deckToDelete.value = deck
+  showDeleteModal.value = true
+}
+
+const handleEditSubmit = async (deckData: Partial<Deck>) => {
+  if (!editingDeck.value) return
+
+  try {
+    await updateDocument('decks', editingDeck.value.id, deckData)
+
+    toast.add({
+      title: 'Deck Updated',
+      description: `${deckData.name} has been updated successfully`,
+      color: 'success'
+    })
+
+    showEditDeckModal.value = false
+    await refreshDecks()
+  } catch (error: any) {
+    console.error('Error updating deck:', error)
+
+    if (error.code === 'permission-denied') {
+      toast.add({
+        title: 'Permission Denied',
+        description: 'You do not have permission to edit this deck',
+        color: 'error'
+      })
+    } else {
+      toast.add({
+        title: 'Error',
+        description: 'Failed to update deck',
+        color: 'error'
+      })
+    }
+  }
+}
+
+const confirmDelete = async () => {
+  if (!deckToDelete.value) return
+
+  isDeleting.value = true
+  try {
+    await deleteDocument('decks', deckToDelete.value.id)
+
+    toast.add({
+      title: 'Deck Deleted',
+      description: 'Your deck has been removed',
+      color: 'success'
+    })
+
+    showDeleteModal.value = false
+    deckToDelete.value = null
+    await refreshDecks()
+  } catch (error: any) {
+    console.error('Error deleting deck:', error)
+
+    if (error.code === 'permission-denied') {
+      toast.add({
+        title: 'Permission Denied',
+        description: 'You do not have permission to delete this deck',
+        color: 'error'
+      })
+    } else {
+      toast.add({
+        title: 'Error',
+        description: 'Failed to delete deck',
+        color: 'error'
+      })
+    }
+  } finally {
+    isDeleting.value = false
+  }
 }
 
 const fetchDecks = async () => {
@@ -434,16 +473,7 @@ const loadCommanderImages = async (decksList: any[]) => {
 
 const toast = useToast()
 
-const resetDeckForm = () => {
-  deckForm.name = ''
-  deckForm.commander = ''
-  deckForm.colors = []
-  deckForm.budget = 0
-  deckForm.description = ''
-  deckForm.decklistUrl = ''
-}
-
-const handleAddDeck = async () => {
+const handleAddDeck = async (deckData: Partial<Deck>) => {
   if (!user.value) {
     toast.add({
       title: 'Authentication Required',
@@ -462,49 +492,21 @@ const handleAddDeck = async () => {
     return
   }
 
-  // Validate form
-  const errors = validateDeck(deckForm)
-  if (errors.length > 0) {
+  if (!currentPlayerId.value) {
     toast.add({
-      title: 'Validation Error',
-      description: errors[0].message,
+      title: 'Profile Not Found',
+      description: 'Please set up your player profile first',
       color: 'error'
     })
     return
   }
 
-  isSubmitting.value = true
   try {
-    // Get player profile to link deck to player
-    const { $db } = useNuxtApp()
-    const { collection, query, where, getDocs } = await import('firebase/firestore')
-
-    const playersRef = collection($db, 'players')
-    const q = query(playersRef, where('userId', '==', user.value.uid))
-    const playerSnapshot = await getDocs(q)
-
-    if (playerSnapshot.empty) {
-      toast.add({
-        title: 'Profile Not Found',
-        description: 'Please set up your player profile first',
-        color: 'error'
-      })
-      return
-    }
-
-    const playerDoc = playerSnapshot.docs[0]
-    const playerId = playerDoc.id
-
     // Add deck to Firestore with seasonId
     await addDocument('decks', {
       seasonId: activeSeason.value.id,
-      name: deckForm.name,
-      commander: deckForm.commander,
-      colors: deckForm.colors,
-      budget: deckForm.budget,
-      description: deckForm.description || '',
-      decklistUrl: deckForm.decklistUrl || '',
-      ownerId: playerId,
+      ...deckData,
+      ownerId: currentPlayerId.value,
       owner: user.value.displayName || 'Anonymous',
       wins: 0,
       games: 0
@@ -513,12 +515,11 @@ const handleAddDeck = async () => {
     // Show success message
     toast.add({
       title: 'Deck Added Successfully!',
-      description: `${deckForm.name} has been added to your collection`,
+      description: `${deckData.name} has been added to your collection`,
       color: 'success'
     })
 
-    // Reset form and close modal
-    resetDeckForm()
+    // Close modal
     showAddDeckModal.value = false
 
     // Refresh decks list
@@ -530,8 +531,13 @@ const handleAddDeck = async () => {
       description: 'An error occurred. Please try again.',
       color: 'error'
     })
-  } finally {
-    isSubmitting.value = false
+  }
+}
+
+// Handle window resize to clear active deck on mobile
+const handleResize = () => {
+  if (typeof window !== 'undefined' && window.innerWidth < 768) {
+    activeDeckId.value = null
   }
 }
 
@@ -553,11 +559,33 @@ onMounted(async () => {
       currentSeasonName.value = 'All Seasons'
     }
 
+    // Get current player ID for ownership checks
+    if (user.value) {
+      const players = await getDocuments('players', [
+        where('userId', '==', user.value.uid)
+      ])
+      if (players.length > 0) {
+        currentPlayerId.value = players[0].id
+      }
+    }
+
     // Load decks
     await fetchDecks()
+
+    // Add resize listener
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', handleResize)
+    }
   } catch (error) {
     console.error('Error loading data:', error)
     currentSeasonName.value = 'Error loading seasons'
+  }
+})
+
+// Clean up resize listener
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('resize', handleResize)
   }
 })
 </script>
@@ -617,36 +645,46 @@ onMounted(async () => {
 }
 
 .decks-grid {
-  @apply grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4;
+  @apply grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4;
 }
 
 .deck-card {
-  @apply relative rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:scale-105;
+  @apply relative rounded-xl overflow-hidden transition-all duration-300;
   aspect-ratio: 3 / 4;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  cursor: default; /* No pointer cursor on mobile */
 }
 
-.deck-card:hover {
-  box-shadow:
-    0 0 30px rgba(255, 215, 0, 0.4),
-    0 0 60px rgba(255, 105, 180, 0.3),
-    0 8px 16px rgba(0, 0, 0, 0.5);
+@media (min-width: 768px) {
+  .deck-card {
+    @apply cursor-pointer;
+  }
+
+  .deck-card:hover {
+    transform: scale(1.05);
+    box-shadow:
+      0 0 30px rgba(255, 215, 0, 0.4),
+      0 0 60px rgba(255, 105, 180, 0.3),
+      0 8px 16px rgba(0, 0, 0, 0.5);
+  }
 }
 
-.deck-card::before {
-  content: '';
-  @apply absolute inset-0 opacity-0 transition-opacity duration-300 pointer-events-none;
-  background: linear-gradient(45deg,
-      transparent 30%,
-      rgba(255, 215, 0, 0.1) 50%,
-      transparent 70%);
-  background-size: 200% 200%;
-  animation: shimmer 3s linear infinite;
-  z-index: 10;
-}
+@media (min-width: 768px) {
+  .deck-card::before {
+    content: '';
+    @apply absolute inset-0 opacity-0 transition-opacity duration-300 pointer-events-none;
+    background: linear-gradient(45deg,
+        transparent 30%,
+        rgba(255, 215, 0, 0.1) 50%,
+        transparent 70%);
+    background-size: 200% 200%;
+    animation: shimmer 3s linear infinite;
+    z-index: 10;
+  }
 
-.deck-card:hover::before {
-  @apply opacity-100;
+  .deck-card:hover::before {
+    @apply opacity-100;
+  }
 }
 
 @keyframes shimmer {
@@ -688,49 +726,117 @@ onMounted(async () => {
 }
 
 .card-overlay-content {
-  @apply absolute inset-0 p-4 flex flex-col justify-end;
+  @apply absolute inset-0 flex flex-col justify-end;
+  padding: 0.75rem;
+  padding-top: 3rem; /* Extra padding at top for edit/delete buttons */
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+}
+
+@media (min-width: 768px) {
+  .card-overlay-content {
+    @apply p-4;
+    padding-top: 1rem;
+  }
 }
 
 /* ================= CARD INFO STACK ================= */
 
 .card-info-stack {
-  @apply flex flex-col gap-3;
+  @apply flex flex-col gap-2 md:gap-3;
 }
 
 .overlay-deck-name {
-  @apply text-lg md:text-xl font-black text-white leading-tight;
+  @apply text-base md:text-xl font-black text-white leading-tight line-clamp-2;
 }
 
 .overlay-commander-name {
-  @apply text-sm md:text-base text-twilight-blue-200 font-semibold leading-tight;
+  @apply text-xs md:text-base text-twilight-blue-200 font-semibold leading-tight line-clamp-1;
 }
 
 .overlay-color-identity {
-  @apply flex items-center gap-2 flex-wrap;
+  @apply flex items-center gap-1.5 md:gap-2 flex-wrap;
 }
 
 .mana-symbol {
-  @apply w-7 h-7 md:w-8 md:h-8;
+  @apply w-6 h-6 md:w-8 md:h-8;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8));
 }
 
 /* ================= OVERLAY STATS ================= */
 
 .overlay-stat-item {
-  @apply flex flex-col gap-1;
+  @apply flex flex-col gap-0.5 md:gap-1;
 }
 
 .stat-label-text {
-  @apply text-xs uppercase tracking-wider text-twilight-blue-300 font-semibold;
+  @apply text-[10px] md:text-xs uppercase tracking-wider text-twilight-blue-300 font-semibold;
 }
 
 .stat-value-text {
-  @apply text-base md:text-lg text-white font-black;
+  @apply text-sm md:text-lg text-white font-black;
 }
 
 .season-badge-overlay {
-  @apply mt-2 px-3 py-1 rounded-full bg-lorwyn-gold-500/20 border border-lorwyn-gold-500/40 text-lorwyn-gold-400 text-xs font-bold uppercase tracking-wider inline-block;
+  @apply mt-1 md:mt-2 px-2 py-0.5 md:px-3 md:py-1 rounded-full bg-lorwyn-gold-500/20 border border-lorwyn-gold-500/40 text-lorwyn-gold-400 text-[9px] md:text-xs font-bold uppercase tracking-wider inline-block;
+}
+
+/* ================= DECK ACTIONS ================= */
+
+/* Deck Actions - Mobile Buttons (Stacked Vertically) */
+.deck-actions-mobile {
+  @apply absolute top-2 right-2 flex flex-col gap-2 z-20;
+  /* Only visible on mobile */
+  display: flex;
+}
+
+.mobile-action-btn {
+  @apply shadow-lg;
+  min-width: 44px; /* Minimum touch target size */
+  min-height: 44px;
+}
+
+@media (min-width: 768px) {
+  .deck-actions-mobile {
+    @apply hidden;
+  }
+}
+
+/* Deck Actions - Centered (Desktop) */
+.deck-actions-center {
+  @apply absolute inset-0 flex flex-col items-center justify-center z-30;
+  background: rgba(100, 100, 100, 0.5); /* Semi-transparent grey overlay */
+  backdrop-filter: blur(4px);
+  padding: 2rem 1rem;
+  display: none; /* Hidden on mobile */
+}
+
+@media (min-width: 768px) {
+  .deck-actions-center {
+    @apply flex;
+  }
+}
+
+.action-buttons {
+  @apply flex flex-col gap-3 w-full max-w-xs;
+}
+
+.action-button {
+  @apply w-full bg-linear-to-r from-lorwyn-gold-500 to-shadowmoor-magenta-500 hover:from-lorwyn-gold-600 hover:to-shadowmoor-magenta-600 text-white font-bold shadow-lg;
+}
+
+/* Active deck card state */
+.deck-card.active {
+  @apply cursor-default;
+}
+
+@media (min-width: 768px) {
+  .deck-card.active {
+    transform: scale(1.05);
+    box-shadow:
+      0 0 30px rgba(255, 215, 0, 0.6),
+      0 0 60px rgba(255, 105, 180, 0.4),
+      0 8px 16px rgba(0, 0, 0, 0.5);
+  }
 }
 
 /* ================= EMPTY STATE ================= */

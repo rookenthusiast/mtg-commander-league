@@ -62,7 +62,7 @@
                 icon="i-heroicons-shield-check">
                 Admin
               </UButton>
-              <UButton to="/setup-profile" variant="ghost"
+              <UButton to="/profile" variant="ghost"
                 class="text-twilight-blue-200 hover:text-white hover:bg-shadowmoor-purple-800 font-semibold">
                 Profile
               </UButton>
@@ -115,7 +115,7 @@
               icon="i-heroicons-shield-check" block>
               Admin
             </UButton>
-            <UButton to="/setup-profile" variant="ghost"
+            <UButton to="/profile" variant="ghost"
               class="text-twilight-blue-200 hover:text-white hover:bg-shadowmoor-purple-800 w-full justify-start" block>
               Profile
             </UButton>
