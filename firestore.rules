@@ -18,11 +18,19 @@ service cloud.firestore {
     match /playerSeasons/{playerSeasonId} {
       allow read: if true;
       // Allow authenticated users to create playerSeason documents
-      // Verify ownership by checking if the player document's userId matches auth.uid
+      // Verify ownership and validate registeredDeckIds (1-3 decks required)
       allow create: if request.auth != null
-        && get(/databases/$(database)/documents/players/$(request.resource.data.playerId)).data.userId == request.auth.uid;
+        && get(/databases/$(database)/documents/players/$(request.resource.data.playerId)).data.userId == request.auth.uid
+        && request.resource.data.registeredDeckIds is list
+        && request.resource.data.registeredDeckIds.size() >= 1
+        && request.resource.data.registeredDeckIds.size() <= 3;
+      // Allow authenticated users to update playerSeason stats (for game submissions)
+      // Validate registeredDeckIds on update (must have 1-3 decks)
       allow update: if request.auth != null
-        && get(/databases/$(database)/documents/players/$(resource.data.playerId)).data.userId == request.auth.uid;
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['registeredDeckIds'])
+          || (request.resource.data.registeredDeckIds is list
+            && request.resource.data.registeredDeckIds.size() >= 1
+            && request.resource.data.registeredDeckIds.size() <= 3));
       // Users can delete their own, admins can delete any
       allow delete: if (request.auth != null && get(/databases/$(database)/documents/players/$(resource.data.playerId)).data.userId == request.auth.uid) || isAdmin();
     }
@@ -75,9 +83,9 @@ service cloud.firestore {
     match /decks/{deckId} {
       allow read: if true;
       allow create: if request.auth != null;
-      // Verify ownership by checking if the player document's userId matches auth.uid
-      allow update: if request.auth != null
-        && get(/databases/$(database)/documents/players/$(resource.data.ownerId)).data.userId == request.auth.uid;
+      // Allow authenticated users to update deck stats (for game submissions)
+      // This allows any authenticated user to update games/wins when submitting game results
+      allow update: if request.auth != null;
       // Owners can delete their own, admins can delete any
       allow delete: if (request.auth != null
         && get(/databases/$(database)/documents/players/$(resource.data.ownerId)).data.userId == request.auth.uid)

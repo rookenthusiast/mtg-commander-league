@@ -51,9 +51,14 @@
         <template #header>
           <div class="decks-header">
             <h2 class="section-title">My Decks ({{ userDecks.length }})</h2>
-            <UButton icon="i-heroicons-plus" size="lg" class="add-deck-button" @click="showAddDeckModal = true">
-              Add Deck
-            </UButton>
+            <div class="deck-actions">
+              <UButton to="/seasons/manage-decks" variant="outline" size="lg" icon="i-heroicons-adjustments-horizontal">
+                Manage Season Decks
+              </UButton>
+              <UButton icon="i-heroicons-plus" size="lg" class="add-deck-button" @click="showAddDeckModal = true">
+                Add Deck
+              </UButton>
+            </div>
           </div>
         </template>
 
@@ -107,11 +112,6 @@
                 <div class="overlay-stat-item">
                   <span class="stat-label-text">Record</span>
                   <span class="stat-value-text">{{ deck.wins }}-{{ deck.games - deck.wins }}</span>
-                </div>
-
-                <!-- Season Badge -->
-                <div v-if="deck.seasonName" class="season-badge-overlay">
-                  {{ deck.seasonName }}
                 </div>
               </div>
 
@@ -256,21 +256,14 @@ const fetchProfileData = async () => {
       decks = []
     }
 
-    // Add season names to decks and sort by creation date
-    const decksWithSeasonNames = decks.map((deck: any) => {
-      const season = allSeasons.value.find((s: Season) => s.id === deck.seasonId)
-      return {
-        ...deck,
-        seasonName: season ? season.name : 'Unknown Season'
-      }
-    }).sort((a: any, b: any) => {
-      // Sort by createdAt descending (newest first)
+    // Sort decks by creation date (newest first)
+    const sortedDecks = decks.sort((a: any, b: any) => {
       const aTime = a.createdAt?.toMillis?.() || 0
       const bTime = b.createdAt?.toMillis?.() || 0
       return bTime - aTime
     })
 
-    userDecks.value = decksWithSeasonNames
+    userDecks.value = sortedDecks
     console.log('Final userDecks count:', userDecks.value.length)
 
     // Load commander images
@@ -659,6 +652,10 @@ onUnmounted(() => {
   @apply flex items-center justify-between flex-wrap gap-4;
 }
 
+.deck-actions {
+  @apply flex flex-col sm:flex-row gap-3;
+}
+
 .add-deck-button {
   @apply bg-linear-to-r from-lorwyn-gold-500 to-shadowmoor-magenta-500 hover:from-lorwyn-gold-600 hover:to-shadowmoor-magenta-600 text-white font-bold shadow-lg;
 }
@@ -756,10 +753,6 @@ onUnmounted(() => {
 
 .stat-value-text {
   @apply text-sm md:text-lg text-white font-black;
-}
-
-.season-badge-overlay {
-  @apply mt-1 md:mt-2 px-2 py-0.5 md:px-3 md:py-1 rounded-full bg-lorwyn-gold-500/20 border border-lorwyn-gold-500/40 text-lorwyn-gold-400 text-[9px] md:text-xs font-bold uppercase tracking-wider inline-block;
 }
 
 /* Deck Actions - Mobile Buttons (Stacked Vertically) */

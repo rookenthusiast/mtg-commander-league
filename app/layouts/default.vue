@@ -15,9 +15,6 @@
                   class="text-2xl font-black tracking-tight bg-linear-to-r from-lorwyn-gold-400 to-shadowmoor-magenta-400 bg-clip-text text-transparent">
                   BUDGET DUCKS
                 </div>
-                <div class="text-xs text-twilight-blue-300 font-semibold uppercase tracking-wider">
-                  Commander League
-                </div>
               </div>
             </NuxtLink>
           </div>
@@ -27,24 +24,23 @@
               class="text-twilight-blue-200 hover:text-white hover:bg-shadowmoor-purple-800 font-semibold">
               Home
             </UButton>
-            <UButton to="/leaderboard" variant="ghost"
-              class="text-twilight-blue-200 hover:text-white hover:bg-shadowmoor-purple-800 font-semibold">
-              Leaderboard
-            </UButton>
-            <UButton to="/seasons" variant="ghost"
-              class="text-twilight-blue-200 hover:text-white hover:bg-shadowmoor-purple-800 font-semibold">
-              Seasons
-            </UButton>
-            <UButton to="/decks" variant="ghost"
-              class="text-twilight-blue-200 hover:text-white hover:bg-shadowmoor-purple-800 font-semibold">
-              Decks
-            </UButton>
+
+            <!-- League Dropdown -->
+            <UDropdownMenu :items="leagueMenuItems">
+              <UButton variant="ghost"
+                class="text-twilight-blue-200 hover:text-white hover:bg-shadowmoor-purple-800 font-semibold"
+                trailing-icon="i-heroicons-chevron-down">
+                League
+              </UButton>
+            </UDropdownMenu>
+
             <UButton to="/rules" variant="ghost"
               class="text-twilight-blue-200 hover:text-white hover:bg-shadowmoor-purple-800 font-semibold">
               Rules
             </UButton>
+
             <UButton to="/submit-game"
-              class="ml-4 bg-linear-to-r from-lorwyn-gold-500 to-shadowmoor-magenta-500 hover:from-lorwyn-gold-600 hover:to-shadowmoor-magenta-600 text-white font-bold shadow-lg shadow-lorwyn-gold-500/50 border-2 border-lorwyn-gold-400">
+              class="ml-2 bg-linear-to-r from-lorwyn-gold-500 to-shadowmoor-magenta-500 hover:from-lorwyn-gold-600 hover:to-shadowmoor-magenta-600 text-white font-bold shadow-lg shadow-lorwyn-gold-500/50 border-2 border-lorwyn-gold-400">
               Submit Match
             </UButton>
           </nav>
@@ -54,30 +50,16 @@
             <UButton icon="i-heroicons-bars-3" variant="ghost" @click="isMobileMenuOpen = !isMobileMenuOpen" />
           </div>
 
-          <!-- Auth buttons -->
+          <!-- Account Dropdown -->
           <div class="hidden md:flex items-center space-x-2">
-            <template v-if="user">
-              <UButton v-if="isAdmin" to="/admin" variant="ghost"
-                class="text-lorwyn-gold-400 hover:text-lorwyn-gold-300 hover:bg-shadowmoor-purple-800 font-semibold"
-                icon="i-heroicons-shield-check">
-                Admin
-              </UButton>
-              <UButton to="/profile" variant="ghost"
-                class="text-twilight-blue-200 hover:text-white hover:bg-shadowmoor-purple-800 font-semibold">
-                Profile
-              </UButton>
+            <UDropdownMenu :items="accountMenuItems">
               <UButton variant="ghost"
                 class="text-twilight-blue-200 hover:text-white hover:bg-shadowmoor-purple-800 font-semibold"
-                @click="handleSignOut">
-                Sign Out
+                :icon="user ? 'i-heroicons-user-circle' : undefined"
+                trailing-icon="i-heroicons-chevron-down">
+                {{ user ? 'Account' : 'Sign In' }}
               </UButton>
-            </template>
-            <template v-else>
-              <UButton to="/auth/login"
-                class="bg-shadowmoor-purple-800 hover:bg-shadowmoor-purple-700 text-white font-semibold border-2 border-shadowmoor-purple-600 hover:border-shadowmoor-magenta-500">
-                Sign In
-              </UButton>
-            </template>
+            </UDropdownMenu>
           </div>
         </div>
 
@@ -179,6 +161,8 @@
 </template>
 
 <script setup lang="ts">
+import type { DropdownMenuItem } from '@nuxt/ui'
+
 const isMobileMenuOpen = ref(false)
 const { user, signOut } = useAuth()
 const { isAdmin, checkAdminStatus } = useAdmin()
@@ -194,4 +178,67 @@ const handleSignOut = async () => {
   await signOut()
   navigateTo('/')
 }
+
+// League dropdown menu items
+const leagueMenuItems = computed<DropdownMenuItem[]>(() => [
+  {
+    label: 'Leaderboard',
+    icon: 'i-heroicons-trophy',
+    to: '/leaderboard'
+  },
+  {
+    label: 'Seasons',
+    icon: 'i-heroicons-calendar-days',
+    to: '/seasons'
+  },
+  {
+    label: 'Decks',
+    icon: 'i-heroicons-squares-2x2',
+    to: '/decks'
+  }
+])
+
+// Account dropdown menu items
+const accountMenuItems = computed<DropdownMenuItem[][]>(() => {
+  if (user.value) {
+    const profileItems: DropdownMenuItem[] = [
+      {
+        label: 'Profile',
+        icon: 'i-heroicons-user',
+        to: '/profile'
+      }
+    ]
+
+    // Add admin link if user is admin
+    if (isAdmin.value) {
+      profileItems.push({
+        label: 'Admin',
+        icon: 'i-heroicons-shield-check',
+        to: '/admin'
+      })
+    }
+
+    // Return items with sign out option as a separate group
+    return [
+      profileItems,
+      [
+        {
+          label: 'Sign Out',
+          icon: 'i-heroicons-arrow-right-on-rectangle',
+          onSelect: handleSignOut
+        }
+      ]
+    ]
+  } else {
+    return [
+      [
+        {
+          label: 'Sign In',
+          icon: 'i-heroicons-arrow-left-on-rectangle',
+          to: '/auth/login'
+        }
+      ]
+    ]
+  }
+})
 </script>

@@ -20,7 +20,6 @@ export interface Player {
 
 export interface Deck {
   id: string
-  seasonId: string
   name: string
   commander: string
   colors: string[]
@@ -82,6 +81,7 @@ export interface PlayerSeason {
   playerId: string
   seasonId: string
   displayName: string
+  registeredDeckIds: string[] // Array of deck IDs registered for this season (min 1, max 3)
   points: number
   wins: number
   losses: number

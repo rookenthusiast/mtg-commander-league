@@ -163,16 +163,23 @@ export const useSeasons = () => {
   }
 
   /**
-   * Register a player for the current active season
+   * Register a player for the current active season with decks
    * @param playerId - The player ID
    * @param displayName - The player's display name
+   * @param deckIds - Array of deck IDs to register (min 1, max 3)
    * @returns The created PlayerSeason document ID
    */
   const registerPlayerForSeason = async (
     playerId: string,
-    displayName: string
+    displayName: string,
+    deckIds: string[]
   ): Promise<string> => {
     try {
+      // Validate deck count
+      if (deckIds.length < 1 || deckIds.length > 3) {
+        throw new Error('Must register between 1 and 3 decks')
+      }
+
       // Get active season
       const activeSeason = await getActiveSeason()
       if (!activeSeason) {
@@ -190,6 +197,7 @@ export const useSeasons = () => {
         playerId,
         seasonId: activeSeason.id,
         displayName,
+        registeredDeckIds: deckIds,
         points: 0,
         wins: 0,
         losses: 0,
@@ -294,6 +302,65 @@ export const useSeasons = () => {
     }
   }
 
+  /**
+   * Get registered decks for a player's season
+   * @param playerId - The player ID
+   * @param seasonId - The season ID
+   * @returns Array of deck IDs
+   */
+  const getRegisteredDecks = async (
+    playerId: string,
+    seasonId: string
+  ): Promise<string[]> => {
+    try {
+      const playerSeason = await getPlayerSeason(playerId, seasonId)
+      return playerSeason?.registeredDeckIds || []
+    } catch (error) {
+      console.error('Error getting registered decks:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Update registered decks for a player's season
+   * @param playerId - The player ID
+   * @param seasonId - The season ID
+   * @param deckIds - New array of deck IDs (min 1, max 3)
+   */
+  const updateRegisteredDecks = async (
+    playerId: string,
+    seasonId: string,
+    deckIds: string[]
+  ): Promise<void> => {
+    try {
+      // Validate deck count
+      if (deckIds.length < 1 || deckIds.length > 3) {
+        throw new Error('Must have between 1 and 3 decks registered')
+      }
+
+      // Find the playerSeason document
+      const playerSeasons = await getDocuments('playerSeasons', [
+        where('playerId', '==', playerId),
+        where('seasonId', '==', seasonId),
+        firestoreLimit(1)
+      ])
+
+      if (playerSeasons.length === 0) {
+        throw new Error('Player not registered for this season')
+      }
+
+      const playerSeasonId = playerSeasons[0]!.id
+      const { updateDocument } = useFirestore()
+
+      await updateDocument('playerSeasons', playerSeasonId, {
+        registeredDeckIds: deckIds
+      })
+    } catch (error) {
+      console.error('Error updating registered decks:', error)
+      throw error
+    }
+  }
+
   return {
     getActiveSeason,
     getAllSeasons,
@@ -304,6 +371,8 @@ export const useSeasons = () => {
     registerPlayerForSeason,
     deregisterPlayer,
     getRegisteredPlayers,
-    updatePlayerStats
+    updatePlayerStats,
+    getRegisteredDecks,
+    updateRegisteredDecks
   }
 }

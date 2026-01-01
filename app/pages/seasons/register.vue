@@ -65,7 +65,10 @@
           You're already registered for {{ activeSeason.name }}
         </p>
         <div class="registered-actions">
-          <UButton to="/leaderboard" size="lg">
+          <UButton to="/seasons/manage-decks" size="lg" icon="i-heroicons-adjustments-horizontal">
+            Manage Decks
+          </UButton>
+          <UButton to="/leaderboard" variant="outline" size="lg">
             View Leaderboard
           </UButton>
           <UButton to="/submit-game" variant="outline" size="lg">
@@ -109,6 +112,58 @@
         </div>
       </UCard>
 
+      <!-- Deck Selection Card -->
+      <UCard variant="soft" class="deck-selection-card">
+        <h3 class="deck-selection-title">Select Your Decks</h3>
+        <p class="deck-selection-text">
+          Choose 1-3 decks to register for this season. You can switch decks later from your profile.
+        </p>
+
+        <!-- No Decks Warning -->
+        <div v-if="availableDecks.length === 0" class="no-decks-warning">
+          <span class="warning-icon">⚠️</span>
+          <p class="warning-text">You don't have any decks yet. Create at least one deck to register.</p>
+          <UButton to="/decks" variant="outline" size="lg" class="mt-4">
+            Create a Deck
+          </UButton>
+        </div>
+
+        <!-- Deck Selection -->
+        <div v-else class="deck-list">
+          <div
+            v-for="deck in availableDecks"
+            :key="deck.id"
+            @click="toggleDeck(deck.id)"
+            class="deck-item"
+            :class="{ 'deck-selected': selectedDeckIds.includes(deck.id) }"
+          >
+            <div class="deck-checkbox">
+              <input
+                type="checkbox"
+                :checked="selectedDeckIds.includes(deck.id)"
+                :disabled="!selectedDeckIds.includes(deck.id) && selectedDeckIds.length >= 3"
+                class="checkbox-input"
+              />
+            </div>
+            <div class="deck-info">
+              <h4 class="deck-name">{{ deck.name }}</h4>
+              <p class="deck-commander">{{ deck.commander }}</p>
+              <div class="deck-meta">
+                <span class="deck-budget">${{ deck.budget }}</span>
+                <span class="deck-colors">{{ formatColors(deck.colors) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="availableDecks.length > 0" class="deck-count-info">
+          <p class="count-text">
+            {{ selectedDeckIds.length }} / 3 decks selected
+            <span v-if="selectedDeckIds.length === 0" class="text-red-400">(minimum 1 required)</span>
+          </p>
+        </div>
+      </UCard>
+
       <!-- Confirmation Card -->
       <UCard variant="soft" class="confirmation-card">
         <h3 class="confirmation-title">Confirm Registration</h3>
@@ -142,7 +197,7 @@
           <UButton
             @click="handleRegister"
             :loading="registering"
-            :disabled="success"
+            :disabled="success || selectedDeckIds.length === 0"
             size="lg"
             block
             class="register-button"
@@ -159,7 +214,7 @@
 </template>
 
 <script setup lang="ts">
-import type { Season } from '~/types'
+import type { Season, Deck } from '~/types'
 
 const { user } = useAuth()
 const {
@@ -177,6 +232,8 @@ const alreadyRegistered = ref(false)
 const registeredPlayerCount = ref(0)
 const error = ref('')
 const success = ref(false)
+const availableDecks = ref<Deck[]>([])
+const selectedDeckIds = ref<string[]>([])
 
 // Format date helper
 const formatDate = (dateString: string) => {
@@ -186,6 +243,26 @@ const formatDate = (dateString: string) => {
     month: 'long',
     day: 'numeric'
   })
+}
+
+// Format colors helper
+const formatColors = (colors: string[]) => {
+  if (!colors || colors.length === 0) return 'Colorless'
+  return colors.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ')
+}
+
+// Toggle deck selection
+const toggleDeck = (deckId: string) => {
+  const index = selectedDeckIds.value.indexOf(deckId)
+  if (index > -1) {
+    // Remove if already selected
+    selectedDeckIds.value.splice(index, 1)
+  } else {
+    // Add if not at max
+    if (selectedDeckIds.value.length < 3) {
+      selectedDeckIds.value.push(deckId)
+    }
+  }
 }
 
 // Load season data
@@ -207,7 +284,7 @@ const loadData = async () => {
     const registeredPlayers = await getRegisteredPlayers(active.id)
     registeredPlayerCount.value = registeredPlayers.length
 
-    // Check if current user is already registered
+    // Check if current user is already registered and load their decks
     if (user.value) {
       const players = await getDocuments('players', [
         where('userId', '==', user.value.uid)
@@ -216,6 +293,12 @@ const loadData = async () => {
       if (players.length > 0) {
         const playerId = players[0].id
         alreadyRegistered.value = await isPlayerRegistered(playerId, active.id)
+
+        // Load user's decks (no longer filtered by season)
+        const decks = await getDocuments('decks', [
+          where('ownerId', '==', playerId)
+        ])
+        availableDecks.value = decks as Deck[]
       }
     }
   } catch (err: any) {
@@ -229,6 +312,12 @@ const loadData = async () => {
 // Handle registration
 const handleRegister = async () => {
   if (!user.value || !activeSeason.value) return
+
+  // Validate deck selection
+  if (selectedDeckIds.value.length === 0) {
+    error.value = 'Please select at least one deck'
+    return
+  }
 
   registering.value = true
   error.value = ''
@@ -247,8 +336,8 @@ const handleRegister = async () => {
     const playerId = player.id
     const displayName = player.displayName || user.value.displayName || 'Anonymous'
 
-    // Register for season
-    await registerPlayerForSeason(playerId, displayName)
+    // Register for season with selected decks
+    await registerPlayerForSeason(playerId, displayName, selectedDeckIds.value)
 
     success.value = true
 
@@ -429,6 +518,91 @@ onMounted(() => {
 
 .detail-value {
   @apply text-xl font-bold text-white;
+}
+
+/* Deck Selection Card */
+.deck-selection-card {
+  @apply bg-linear-to-br from-shadowmoor-purple-900/80 to-twilight-blue-900/80 backdrop-blur-sm shadow-xl space-y-6;
+}
+
+.deck-selection-title {
+  @apply text-2xl font-black text-white;
+}
+
+.deck-selection-text {
+  @apply text-twilight-blue-200;
+}
+
+.no-decks-warning {
+  @apply text-center py-8 space-y-4;
+}
+
+.warning-icon {
+  @apply text-4xl;
+}
+
+.warning-text {
+  @apply text-twilight-blue-300;
+}
+
+.deck-list {
+  @apply space-y-3;
+}
+
+.deck-item {
+  @apply flex items-start gap-4 p-4 bg-shadowmoor-purple-800/30 rounded-lg border-2 border-transparent cursor-pointer transition-all duration-200 hover:bg-shadowmoor-purple-800/50;
+}
+
+.deck-item.deck-selected {
+  @apply border-lorwyn-gold-500 bg-shadowmoor-purple-800/50;
+}
+
+.deck-checkbox {
+  @apply shrink-0 pt-1;
+}
+
+.checkbox-input {
+  @apply w-5 h-5 rounded border-2 border-twilight-blue-500 bg-shadowmoor-purple-900 cursor-pointer;
+}
+
+.checkbox-input:checked {
+  @apply bg-lorwyn-gold-500 border-lorwyn-gold-500;
+}
+
+.checkbox-input:disabled {
+  @apply opacity-50 cursor-not-allowed;
+}
+
+.deck-info {
+  @apply flex-1;
+}
+
+.deck-name {
+  @apply text-lg font-bold text-white mb-1;
+}
+
+.deck-commander {
+  @apply text-sm text-twilight-blue-300 mb-2;
+}
+
+.deck-meta {
+  @apply flex gap-4 text-sm;
+}
+
+.deck-budget {
+  @apply text-lorwyn-gold-400 font-semibold;
+}
+
+.deck-colors {
+  @apply text-shadowmoor-magenta-400;
+}
+
+.deck-count-info {
+  @apply text-center pt-2;
+}
+
+.count-text {
+  @apply text-twilight-blue-200 font-semibold;
 }
 
 /* Confirmation Card */

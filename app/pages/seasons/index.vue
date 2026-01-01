@@ -53,16 +53,21 @@
         <!-- Registration Status -->
         <div v-if="user" class="registration-section">
           <div v-if="isRegisteredForActive" class="registered-status">
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 mb-4">
               <span class="check-icon">✓</span>
               <div>
                 <p class="registered-title">You're registered!</p>
                 <p class="registered-subtitle">Your stats are being tracked this season</p>
               </div>
             </div>
-            <UButton to="/leaderboard" variant="outline" size="lg">
-              View Leaderboard
-            </UButton>
+            <div class="flex flex-col sm:flex-row gap-3">
+              <UButton to="/seasons/manage-decks" size="lg" icon="i-heroicons-adjustments-horizontal">
+                Manage Decks
+              </UButton>
+              <UButton to="/leaderboard" variant="outline" size="lg">
+                View Leaderboard
+              </UButton>
+            </div>
           </div>
 
           <div v-else class="not-registered-status">

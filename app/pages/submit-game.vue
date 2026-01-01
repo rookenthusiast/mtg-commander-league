@@ -135,34 +135,6 @@
             />
           </UFormField>
 
-          <!-- Placement (for 3-4 player games) -->
-          <UFormField
-            v-if="formState.players.length >= 3"
-            label="Final Placement"
-            name="placements"
-            help="Order players from 1st place (winner) to last place"
-          >
-            <div class="placement-section">
-              <div class="space-y-3">
-                <div
-                  v-for="(placement, index) in formState.placements"
-                  :key="index"
-                  class="placement-row"
-                >
-                  <span class="placement-number">{{ index + 1 }}{{ getPlacementSuffix(index + 1) }}</span>
-                  <USelect
-                    v-model="formState.placements[index]"
-                    :items="playerOptions"
-                    value-key="value"
-                    :placeholder="`Select ${getPlacementOrdinal(index + 1)} place`"
-                    size="lg"
-                    class="flex-1"
-                  />
-                </div>
-              </div>
-            </div>
-          </UFormField>
-
           <!-- Game Notes -->
           <UFormField
             label="Game Notes (Optional)"
@@ -242,7 +214,6 @@ const formState = reactive({
     { playerId: '', deckId: '' }
   ],
   winnerId: '',
-  placements: ['', '', ''] as string[],
   notes: '',
   turnCount: null as number | null
 })
@@ -293,14 +264,12 @@ const validate = (state: typeof formState) => {
 const addPlayer = () => {
   if (formState.players.length < 4) {
     formState.players.push({ playerId: '', deckId: '' })
-    formState.placements = Array(formState.players.length).fill('')
   }
 }
 
 const removePlayer = (index: number) => {
   if (formState.players.length > 3) {
     formState.players.splice(index, 1)
-    formState.placements = Array(formState.players.length).fill('')
   }
 }
 
@@ -317,20 +286,6 @@ const getPlayerDecks = (playerId: string) => {
 const getPlayerName = (playerId: string) => {
   const player = availablePlayers.value.find(p => p.value === playerId)
   return player?.label || ''
-}
-
-const getPlacementSuffix = (place: number) => {
-  if (place === 1) return 'st'
-  if (place === 2) return 'nd'
-  if (place === 3) return 'rd'
-  return 'th'
-}
-
-const getPlacementOrdinal = (place: number) => {
-  if (place === 1) return '1st'
-  if (place === 2) return '2nd'
-  if (place === 3) return '3rd'
-  return `${place}th`
 }
 
 const handleSubmit = async () => {
@@ -352,7 +307,6 @@ const handleSubmit = async () => {
       date: formState.date,
       players: formState.players,
       winnerId: formState.winnerId,
-      placements: formState.placements,
       notes: formState.notes,
       turnCount: formState.turnCount
     })
@@ -411,7 +365,6 @@ const resetForm = () => {
     { playerId: '', deckId: '' }
   ]
   formState.winnerId = ''
-  formState.placements = ['', '', '']
   formState.notes = ''
   formState.turnCount = null
 }
@@ -436,11 +389,27 @@ onMounted(async () => {
       label: playerSeason.displayName
     }))
 
-    // Fetch decks for the current season only
-    const decks = await getDocuments('decks', [
+    // Fetch all decks that are registered for this season
+    // We need to get all playerSeasons for this season, extract registered deck IDs, then fetch those decks
+    const allPlayerSeasons = await getDocuments('playerSeasons', [
       where('seasonId', '==', season.id)
     ])
-    availableDecks.value = decks.map((deck: any) => ({
+
+    // Collect all registered deck IDs from all players
+    const registeredDeckIds = new Set<string>()
+    allPlayerSeasons.forEach((ps: any) => {
+      if (ps.registeredDeckIds && Array.isArray(ps.registeredDeckIds)) {
+        ps.registeredDeckIds.forEach((deckId: string) => registeredDeckIds.add(deckId))
+      }
+    })
+
+    // Fetch all decks (we'll filter client-side since Firestore doesn't support 'in' queries with large arrays efficiently)
+    const allDecks = await getDocuments('decks', [])
+
+    // Filter to only registered decks
+    const seasonDecks = allDecks.filter((deck: any) => registeredDeckIds.has(deck.id))
+
+    availableDecks.value = seasonDecks.map((deck: any) => ({
       value: deck.id,
       label: `${deck.name} (${deck.commander})`,
       ownerId: deck.ownerId
@@ -583,20 +552,6 @@ onMounted(async () => {
 
 .add-player-button {
   @apply border-2 border-twilight-blue-600/50 hover:bg-twilight-blue-800/30 hover:border-twilight-blue-500/70 font-semibold text-white transition-all duration-200;
-}
-
-/* ================= PLACEMENT ================= */
-
-.placement-section {
-  @apply w-full;
-}
-
-.placement-row {
-  @apply flex items-center gap-3;
-}
-
-.placement-number {
-  @apply flex items-center justify-center w-16 h-10 rounded-full bg-linear-to-br from-lorwyn-gold-500/30 to-shadowmoor-magenta-500/30 text-white font-black text-sm shrink-0;
 }
 
 /* ================= NO PLAYERS WARNING ================= */
