@@ -91,5 +91,19 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/players/$(resource.data.ownerId)).data.userId == request.auth.uid)
         || isAdmin();
     }
+
+    // Deck Versions - read all, create only (immutable snapshots)
+    match /deckVersions/{versionId} {
+      // Anyone can read version data (public)
+      allow read: if true;
+
+      // Only authenticated users can create versions
+      // Typically created via server API when updating deck prices
+      allow create: if request.auth != null;
+
+      // Versions are immutable once created - no updates or deletes allowed
+      // This preserves historical accuracy for game records
+      allow update, delete: if false;
+    }
   }
 }

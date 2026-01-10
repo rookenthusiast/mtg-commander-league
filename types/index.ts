@@ -20,18 +20,62 @@ export interface Player {
 
 export interface Deck {
   id: string
+  seasonId?: string
   name: string
   commander: string
   colors: string[]
-  budget: number
+  decklistText?: string // Text-based decklist (primary method)
+  moxfieldUrl?: string // Optional Moxfield URL (legacy/reference)
+  moxfieldId?: string // Extracted ID from URL (legacy)
   ownerId: string
   owner: string
   wins: number
   games: number
   description?: string
-  decklistUrl?: string
+  currentVersionId?: string // Points to active DeckVersion
+  currentPrice?: number // Cached from current version
+  lastPriceUpdate?: string // When price was last fetched
   createdAt: string
   updatedAt?: string
+}
+
+export interface DeckVersion {
+  id: string
+  deckId: string
+  versionNumber: number // Sequential: 1, 2, 3...
+  isActive: boolean // Only one version should be active at a time
+
+  // Snapshot data (immutable once created)
+  deckName: string
+  totalPrice: number
+  currency: string // "EUR"
+  cardCount: number
+
+  // Decklist data
+  decklistText?: string // Text-based decklist used for this version
+  moxfieldLastModified?: string // Legacy: ISO timestamp from Moxfield
+
+  // Card breakdown (array of card price objects)
+  cards: CardPrice[]
+
+  // Metadata
+  lockedAt: string // When this version was created
+  lockedBy?: string // User ID who triggered update
+  notes?: string // Optional notes about this version
+
+  // Track if this version is used in any games
+  gamesCount?: number // Computed field
+
+  createdAt: string
+}
+
+export interface CardPrice {
+  name: string
+  quantity: number
+  price: number // Individual card price
+  total: number // price * quantity
+  set?: string // Card set code
+  isFoil?: boolean
 }
 
 export interface Game {
@@ -52,6 +96,8 @@ export interface GamePlayer {
   playerName: string
   deckId: string
   deckName: string
+  deckVersionId?: string // Reference to DeckVersion used in this game
+  deckPriceAtGame?: number // Locked price at game time
   placement?: number
 }
 

@@ -19,19 +19,20 @@
           <UCheckboxGroup v-model="deckForm.colors" :items="availableColors" class="w-full" />
         </UFormField>
 
-        <UFormField label="Budget (USD)" name="budget" required help="Total deck cost excluding basic lands">
-          <UInputNumber v-model="deckForm.budget" :min="0" :step="0.01" placeholder="50.00" size="lg" class="w-full" />
+        <UFormField label="Decklist" name="decklistText" required help="Paste your decklist from Moxfield, MTGGoldfish, or Archidekt. Format: '1 Card Name' per line">
+          <UTextarea v-model="deckForm.decklistText" placeholder="1 Sol Ring&#10;1 Command Tower&#10;1 Arcane Signet&#10;..." :rows="8" resize
+            class="w-full font-mono text-sm" />
+        </UFormField>
+
+        <UFormField label="External Decklist URL" name="decklistUrl"
+          help="Optional: Link to your deck on Moxfield, Archidekt, or other deck builder">
+          <UInput v-model="deckForm.decklistUrl" placeholder="https://www.moxfield.com/decks/..." size="lg"
+            class="w-full" />
         </UFormField>
 
         <UFormField label="Deck Description" name="description"
           help="Optional: Describe your deck's strategy and playstyle">
           <UTextarea v-model="deckForm.description" placeholder="This deck focuses on..." :rows="3" resize
-            class="w-full" />
-        </UFormField>
-
-        <UFormField label="Decklist URL" name="decklistUrl"
-          help="Optional: Link to Moxfield, Archidekt, or other deck builder">
-          <UInput v-model="deckForm.decklistUrl" type="url" placeholder="https://www.moxfield.com/decks/..." size="lg"
             class="w-full" />
         </UFormField>
       </UForm>
@@ -72,9 +73,9 @@ const deckForm = reactive({
   name: '',
   commander: '',
   colors: [] as string[],
-  budget: 0,
-  description: '',
-  decklistUrl: ''
+  decklistText: '',
+  decklistUrl: '',
+  description: ''
 })
 
 const availableColors = [
@@ -128,9 +129,9 @@ watch(() => props.deck, (newDeck) => {
     deckForm.name = newDeck.name
     deckForm.commander = newDeck.commander
     deckForm.colors = [...newDeck.colors]
-    deckForm.budget = newDeck.budget
+    deckForm.decklistText = newDeck.decklistText || ''
+    deckForm.decklistUrl = newDeck.moxfieldUrl || ''
     deckForm.description = newDeck.description || ''
-    deckForm.decklistUrl = newDeck.decklistUrl || ''
   }
 }, { immediate: true })
 
@@ -140,9 +141,9 @@ watch(() => props.isOpen, (newValue) => {
     deckForm.name = ''
     deckForm.commander = ''
     deckForm.colors = []
-    deckForm.budget = 0
-    deckForm.description = ''
+    deckForm.decklistText = ''
     deckForm.decklistUrl = ''
+    deckForm.description = ''
   }
 })
 
@@ -157,15 +158,22 @@ const validateDeck = (state: typeof deckForm) => {
     errors.push({ name: 'commander', message: 'Commander name is required' })
   }
 
-  if (state.budget === null || state.budget === undefined || state.budget < 0) {
-    errors.push({ name: 'budget', message: 'Budget must be a positive number' })
+  if (!state.decklistText || state.decklistText.trim() === '') {
+    errors.push({ name: 'decklistText', message: 'Decklist is required. Paste your decklist from a deck builder.' })
+  } else {
+    // Basic validation: check if there are at least a few lines that look like cards
+    const lines = state.decklistText.split('\n').filter(line => line.trim().length > 0)
+    if (lines.length < 5) {
+      errors.push({ name: 'decklistText', message: 'Decklist seems too short. Please paste a complete decklist.' })
+    }
   }
 
+  // Optional URL validation
   if (state.decklistUrl && state.decklistUrl.trim() !== '') {
     try {
       new URL(state.decklistUrl)
     } catch {
-      errors.push({ name: 'decklistUrl', message: 'Please enter a valid URL' })
+      errors.push({ name: 'decklistUrl', message: 'Please enter a valid URL (e.g., https://www.moxfield.com/decks/...)' })
     }
   }
 
@@ -190,9 +198,9 @@ const handleSubmit = async () => {
       name: deckForm.name,
       commander: deckForm.commander,
       colors: deckForm.colors,
-      budget: deckForm.budget,
-      description: deckForm.description || '',
-      decklistUrl: deckForm.decklistUrl || ''
+      decklistText: deckForm.decklistText,
+      moxfieldUrl: deckForm.decklistUrl || '',
+      description: deckForm.description || ''
     })
   } finally {
     isSubmitting.value = false

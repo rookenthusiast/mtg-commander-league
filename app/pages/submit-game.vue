@@ -200,6 +200,7 @@ import type { Season } from '~/types'
 const { user } = useAuth()
 const { getDocuments, addDocument, updateDocument, increment, where } = useFirestore()
 const { getActiveSeason, getRegisteredPlayers, updatePlayerStats } = useSeasons()
+const { getActiveVersion } = useDeckVersions()
 const toast = useToast()
 
 const isSubmitting = ref(false)
@@ -301,11 +302,34 @@ const handleSubmit = async () => {
   isSubmitting.value = true
 
   try {
-    // Submit game to Firestore with seasonId
+    // Fetch active versions for all decks and lock prices
+    const playersWithVersions = await Promise.all(
+      formState.players.map(async (player) => {
+        try {
+          const activeVersion = await getActiveVersion(player.deckId)
+
+          return {
+            ...player,
+            deckVersionId: activeVersion?.id || null,
+            deckPriceAtGame: activeVersion?.totalPrice || null
+          }
+        } catch (error) {
+          console.error(`Error fetching version for deck ${player.deckId}:`, error)
+          // If version fetch fails, still include the player but without version data
+          return {
+            ...player,
+            deckVersionId: null,
+            deckPriceAtGame: null
+          }
+        }
+      })
+    )
+
+    // Submit game to Firestore with seasonId and locked versions
     await addDocument('games', {
       seasonId: activeSeason.value.id,
       date: formState.date,
-      players: formState.players,
+      players: playersWithVersions,
       winnerId: formState.winnerId,
       notes: formState.notes,
       turnCount: formState.turnCount
@@ -339,7 +363,7 @@ const handleSubmit = async () => {
     // Show success message
     toast.add({
       title: 'Game Submitted!',
-      description: 'Match results have been recorded successfully.',
+      description: 'Match results have been recorded successfully with locked deck prices.',
       color: 'success'
     })
 

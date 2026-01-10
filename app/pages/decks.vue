@@ -89,10 +89,23 @@
                   title="Colorless" class="mana-symbol" />
               </div>
 
-              <!-- Budget -->
+              <!-- Price -->
               <div class="overlay-stat-item">
-                <span class="stat-label-text">Budget</span>
-                <span class="stat-value-text">${{ deck.budget }}</span>
+                <span class="stat-label-text">Price</span>
+                <span v-if="deck.currentPrice" class="stat-value-text">€{{ deck.currentPrice.toFixed(2) }}</span>
+                <span v-else-if="deck.decklistText" class="stat-value-text text-twilight-blue-400">
+                  Pending...
+                  <UButton
+                    size="2xs"
+                    variant="soft"
+                    @click.stop="fetchPriceForDeck(deck)"
+                    :loading="fetchingPrices[deck.id]"
+                    class="ml-2"
+                  >
+                    Fetch
+                  </UButton>
+                </span>
+                <span v-else class="stat-value-text text-red-400">No Decklist</span>
               </div>
 
               <!-- Record -->
@@ -120,7 +133,7 @@
                   @click.stop="openEditModal(deck)" class="action-button">
                   Edit
                 </UButton>
-                <UButton v-if="deck.decklistUrl" icon="i-heroicons-arrow-top-right-on-square" size="lg"
+                <UButton v-if="deck.moxfieldUrl" icon="i-heroicons-arrow-top-right-on-square" size="lg"
                   variant="solid" @click.stop="viewDeck(deck)" class="action-button">
                   View List
                 </UButton>
@@ -134,7 +147,7 @@
 
           <!-- Mobile Actions (always visible on mobile) -->
           <div class="deck-actions-mobile">
-            <UButton v-if="deck.decklistUrl" icon="i-heroicons-arrow-top-right-on-square" size="md"
+            <UButton v-if="deck.moxfieldUrl" icon="i-heroicons-arrow-top-right-on-square" size="md"
               variant="solid" @click.stop="viewDeck(deck)" class="mobile-action-btn" />
             <UButton v-if="canEditDeck(deck)" icon="i-heroicons-pencil" size="md" variant="solid"
               @click.stop="openEditModal(deck)" class="mobile-action-btn" />
@@ -226,6 +239,9 @@ const activeDeckId = ref<string | null>(null)
 const commanderImages = ref<Record<string, string | null>>({})
 const loadingImages = ref<Record<string, boolean>>({})
 
+// Track which decks are currently fetching prices
+const fetchingPrices = ref<Record<string, boolean>>({})
+
 const colorFilters = ['all', 'white', 'blue', 'black', 'red', 'green', 'colorless']
 
 // Computed: Season options for dropdown
@@ -309,7 +325,7 @@ const toggleDeckActions = (deckId: string) => {
 }
 
 const viewDeck = (deck: any) => {
-  if (!deck.decklistUrl || deck.decklistUrl.trim() === '') {
+  if (!deck.moxfieldUrl || deck.moxfieldUrl.trim() === '') {
     toast.add({
       title: 'No Decklist URL',
       description: `${deck.name} doesn't have a decklist URL. ${canEditDeck(deck) ? 'Click the edit button to add one.' : 'Contact the deck owner to add one.'}`,
@@ -320,8 +336,8 @@ const viewDeck = (deck: any) => {
 
   // Validate URL format
   try {
-    new URL(deck.decklistUrl)
-    window.open(deck.decklistUrl, '_blank', 'noopener,noreferrer')
+    new URL(deck.moxfieldUrl)
+    window.open(deck.moxfieldUrl, '_blank', 'noopener,noreferrer')
   } catch {
     toast.add({
       title: 'Invalid URL',
@@ -471,6 +487,7 @@ const loadCommanderImages = async (decksList: any[]) => {
   }
 }
 
+const { updateDeckPrice } = useDeckVersions()
 const toast = useToast()
 
 const handleAddDeck = async (deckData: Partial<Deck>) => {
@@ -502,8 +519,18 @@ const handleAddDeck = async (deckData: Partial<Deck>) => {
   }
 
   try {
-    // Add deck to Firestore with seasonId
-    await addDocument('decks', {
+    // Validate decklist text
+    if (!deckData.decklistText || deckData.decklistText.trim().length === 0) {
+      toast.add({
+        title: 'Missing Decklist',
+        description: 'Please provide a decklist to continue',
+        color: 'error'
+      })
+      return
+    }
+
+    // Add deck to Firestore with seasonId and decklistText
+    const newDeckId = await addDocument('decks', {
       seasonId: activeSeason.value.id,
       ...deckData,
       ownerId: currentPlayerId.value,
@@ -512,10 +539,10 @@ const handleAddDeck = async (deckData: Partial<Deck>) => {
       games: 0
     })
 
-    // Show success message
+    // Show initial success message
     toast.add({
       title: 'Deck Added Successfully!',
-      description: `${deckData.name} has been added to your collection`,
+      description: `${deckData.name} has been added. Fetching price data...`,
       color: 'success'
     })
 
@@ -524,6 +551,35 @@ const handleAddDeck = async (deckData: Partial<Deck>) => {
 
     // Refresh decks list
     await refreshDecks()
+
+    // Fetch initial price in background
+    // Note: This happens asynchronously and doesn't block the user
+    try {
+      await updateDeckPrice({
+        decklistText: deckData.decklistText,
+        deckId: newDeckId,
+        deckName: deckData.name,
+        seasonId: activeSeason.value.id,
+        notes: 'Initial price fetch',
+        forceUpdate: true
+      })
+
+      // Refresh to show the price
+      await refreshDecks()
+
+      toast.add({
+        title: 'Price Fetched!',
+        description: 'Deck price has been updated from Scryfall',
+        color: 'success'
+      })
+    } catch (priceError: any) {
+      console.error('Error fetching initial price:', priceError)
+      toast.add({
+        title: 'Price Fetch Delayed',
+        description: 'Click "Fetch" to update price manually',
+        color: 'warning'
+      })
+    }
   } catch (error) {
     console.error('Error adding deck:', error)
     toast.add({
@@ -531,6 +587,59 @@ const handleAddDeck = async (deckData: Partial<Deck>) => {
       description: 'An error occurred. Please try again.',
       color: 'error'
     })
+  }
+}
+
+// Fetch price for a single deck
+const fetchPriceForDeck = async (deck: any) => {
+  if (!deck.decklistText) {
+    toast.add({
+      title: 'No Decklist',
+      description: 'This deck does not have a decklist. Edit the deck to add one.',
+      color: 'error'
+    })
+    return
+  }
+
+  if (!deck.seasonId) {
+    toast.add({
+      title: 'No Season',
+      description: 'This deck is not associated with a season',
+      color: 'error'
+    })
+    return
+  }
+
+  // Set loading state
+  fetchingPrices.value[deck.id] = true
+
+  try {
+    await updateDeckPrice({
+      decklistText: deck.decklistText,
+      deckId: deck.id,
+      deckName: deck.name,
+      seasonId: deck.seasonId,
+      notes: 'Manual price fetch'
+    })
+
+    // Refresh to show the price
+    await refreshDecks()
+
+    toast.add({
+      title: 'Price Updated!',
+      description: `${deck.name} price has been fetched from Scryfall`,
+      color: 'success'
+    })
+  } catch (error: any) {
+    console.error('Error fetching price:', error)
+    toast.add({
+      title: 'Error Fetching Price',
+      description: error.message || 'Failed to fetch price from Scryfall',
+      color: 'error'
+    })
+  } finally {
+    // Clear loading state
+    fetchingPrices.value[deck.id] = false
   }
 }
 

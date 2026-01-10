@@ -111,7 +111,8 @@
                 <h4 class="deck-name">{{ deck.name }}</h4>
                 <p class="deck-commander">{{ deck.commander }}</p>
                 <div class="deck-meta">
-                  <span class="deck-budget">${{ deck.budget }}</span>
+                  <span v-if="deck.currentPrice" class="deck-price">€{{ deck.currentPrice.toFixed(2) }}</span>
+                  <span v-else class="deck-price text-twilight-blue-400">Price pending...</span>
                   <span class="deck-colors">{{ formatColors(deck.colors) }}</span>
                 </div>
               </div>
@@ -492,7 +493,7 @@ onMounted(() => {
   @apply flex gap-4 text-sm;
 }
 
-.deck-budget {
+.deck-price {
   @apply text-lorwyn-gold-400 font-semibold;
 }
 

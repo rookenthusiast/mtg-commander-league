@@ -102,10 +102,10 @@
                     title="Colorless" class="mana-symbol" />
                 </div>
 
-                <!-- Budget -->
+                <!-- Price -->
                 <div class="overlay-stat-item">
-                  <span class="stat-label-text">Budget</span>
-                  <span class="stat-value-text">${{ deck.budget }}</span>
+                  <span class="stat-label-text">Price</span>
+                  <span class="stat-value-text">{{ deck.currentPrice ? `€${deck.currentPrice.toFixed(2)}` : 'Calculating...' }}</span>
                 </div>
 
                 <!-- Record -->
@@ -122,9 +122,13 @@
                     class="action-button">
                     Edit
                   </UButton>
-                  <UButton v-if="deck.decklistUrl" icon="i-heroicons-arrow-top-right-on-square" size="lg"
+                  <UButton v-if="deck.moxfieldUrl" icon="i-heroicons-arrow-top-right-on-square" size="lg"
                     variant="solid" @click.stop="viewDeck(deck)" class="action-button">
                     View List
+                  </UButton>
+                  <UButton v-if="deck.decklistText" icon="i-heroicons-arrow-path" size="lg" variant="solid"
+                    class="action-button" :loading="refreshingPrices[deck.id]" @click.stop="refreshDeckPrice(deck)">
+                    Refresh Price
                   </UButton>
                   <UButton icon="i-heroicons-trash" size="lg" color="error" @click.stop="openDeleteModal(deck)"
                     class="action-button">
@@ -136,8 +140,10 @@
 
             <!-- Mobile Actions (always visible on mobile) -->
             <div class="deck-actions-mobile">
-              <UButton v-if="deck.decklistUrl" icon="i-heroicons-arrow-top-right-on-square" size="md"
+              <UButton v-if="deck.moxfieldUrl" icon="i-heroicons-arrow-top-right-on-square" size="md"
                 variant="solid" @click.stop="viewDeck(deck)" class="mobile-action-btn" />
+              <UButton v-if="deck.decklistText" icon="i-heroicons-arrow-path" size="md" variant="solid"
+                class="mobile-action-btn" :loading="refreshingPrices[deck.id]" @click.stop="refreshDeckPrice(deck)" />
               <UButton icon="i-heroicons-pencil" size="md" variant="solid" @click.stop="openEditModal(deck)"
                 class="mobile-action-btn" />
               <UButton icon="i-heroicons-trash" size="md" color="error" @click.stop="openDeleteModal(deck)"
@@ -184,6 +190,7 @@ const { user } = useAuth()
 const { getDocuments, updateDocument, addDocument, deleteDocument, where } = useFirestore()
 const { getAllSeasons, getActiveSeason } = useSeasons()
 const { fetchCommanderImage } = useScryfall()
+const { updateDeckPrice } = useDeckVersions()
 const toast = useToast()
 
 // State
@@ -214,6 +221,9 @@ const activeDeckId = ref<string | null>(null)
 // Commander images
 const commanderImages = ref<Record<string, string | null>>({})
 const loadingImages = ref<Record<string, boolean>>({})
+
+// Price refresh tracking
+const refreshingPrices = ref<Record<string, boolean>>({})
 
 // Fetch profile data
 const fetchProfileData = async () => {
@@ -400,7 +410,7 @@ const toggleDeckActions = (deckId: string) => {
 }
 
 const viewDeck = (deck: Deck) => {
-  if (!deck.decklistUrl || deck.decklistUrl.trim() === '') {
+  if (!deck.moxfieldUrl || deck.moxfieldUrl.trim() === '') {
     toast.add({
       title: 'No Decklist URL',
       description: `${deck.name} doesn't have a decklist URL. Click the edit button to add one.`,
@@ -411,8 +421,8 @@ const viewDeck = (deck: Deck) => {
 
   // Validate URL format
   try {
-    new URL(deck.decklistUrl)
-    window.open(deck.decklistUrl, '_blank', 'noopener,noreferrer')
+    new URL(deck.moxfieldUrl)
+    window.open(deck.moxfieldUrl, '_blank', 'noopener,noreferrer')
   } catch {
     toast.add({
       title: 'Invalid URL',
@@ -443,7 +453,7 @@ const handleAddDeck = async (deckData: Partial<Deck>) => {
   }
 
   try {
-    await addDocument('decks', {
+    const deckId = await addDocument('decks', {
       seasonId: activeSeason.value.id,
       ...deckData,
       ownerId: playerProfile.value.id,
@@ -451,6 +461,38 @@ const handleAddDeck = async (deckData: Partial<Deck>) => {
       wins: 0,
       games: 0
     })
+
+    // If decklist text is provided, fetch prices from Scryfall
+    if (deckData.decklistText && deckId) {
+      toast.add({
+        title: 'Fetching Prices...',
+        description: 'Getting card prices from Scryfall. This may take a minute.',
+        color: 'info'
+      })
+
+      try {
+        await updateDeckPrice({
+          deckId: deckId,
+          decklistText: deckData.decklistText,
+          deckName: deckData.name,
+          seasonId: activeSeason.value.id,
+          forceUpdate: true
+        })
+
+        toast.add({
+          title: 'Prices Fetched!',
+          description: 'Deck prices have been calculated successfully',
+          color: 'success'
+        })
+      } catch (priceError) {
+        console.error('Error fetching prices:', priceError)
+        toast.add({
+          title: 'Price Fetch Failed',
+          description: 'Deck was added but prices could not be fetched. You can try updating prices later.',
+          color: 'warning'
+        })
+      }
+    }
 
     toast.add({
       title: 'Deck Added Successfully!',
@@ -475,6 +517,32 @@ const handleEditSubmit = async (deckData: Partial<Deck>) => {
 
   try {
     await updateDocument('decks', editingDeck.value.id, deckData)
+
+    // If decklist text was changed, fetch updated prices
+    if (deckData.decklistText && deckData.decklistText !== editingDeck.value.decklistText) {
+      toast.add({
+        title: 'Fetching Prices...',
+        description: 'Getting updated card prices from Scryfall. This may take a minute.',
+        color: 'info'
+      })
+
+      try {
+        await updateDeckPrice({
+          deckId: editingDeck.value.id,
+          decklistText: deckData.decklistText,
+          deckName: deckData.name || editingDeck.value.name,
+          seasonId: editingDeck.value.seasonId,
+          forceUpdate: true
+        })
+      } catch (priceError) {
+        console.error('Error fetching prices:', priceError)
+        toast.add({
+          title: 'Price Fetch Failed',
+          description: 'Deck was updated but prices could not be fetched.',
+          color: 'warning'
+        })
+      }
+    }
 
     toast.add({
       title: 'Deck Updated',
@@ -537,6 +605,66 @@ const confirmDelete = async () => {
     }
   } finally {
     isDeleting.value = false
+  }
+}
+
+const refreshDeckPrice = async (deck: Deck) => {
+  if (!deck.decklistText) {
+    toast.add({
+      title: 'No Decklist',
+      description: `${deck.name} doesn't have a decklist. Add a decklist to fetch prices.`,
+      color: 'warning'
+    })
+    return
+  }
+
+  refreshingPrices.value[deck.id] = true
+  try {
+    toast.add({
+      title: 'Refreshing Prices',
+      description: `Fetching updated prices for ${deck.name}. This may take a minute.`,
+      color: 'info'
+    })
+
+    const result = await updateDeckPrice({
+      deckId: deck.id,
+      decklistText: deck.decklistText,
+      deckName: deck.name,
+      seasonId: deck.seasonId,
+      forceUpdate: true
+    })
+
+    if (result.updated && result.priceDifference !== null && result.priceDifference !== undefined) {
+      const diff = result.priceDifference
+      const diffText = diff > 0
+        ? `increased by €${Math.abs(diff).toFixed(2)}`
+        : diff < 0
+          ? `decreased by €${Math.abs(diff).toFixed(2)}`
+          : 'remained the same'
+
+      toast.add({
+        title: 'Prices Updated',
+        description: `${deck.name} price ${diffText}`,
+        color: 'success'
+      })
+    } else {
+      toast.add({
+        title: 'Prices Refreshed',
+        description: `${deck.name} prices have been updated`,
+        color: 'success'
+      })
+    }
+
+    await fetchProfileData()
+  } catch (error: any) {
+    console.error('Error refreshing prices:', error)
+    toast.add({
+      title: 'Error Refreshing Prices',
+      description: 'Failed to update deck prices. Please try again.',
+      color: 'error'
+    })
+  } finally {
+    refreshingPrices.value[deck.id] = false
   }
 }
 

@@ -8,6 +8,9 @@ A web application for tracking budget Commander league games, decks, and standin
 - **Player Registration**: Players register for each season to compete
 - **Season Leaderboard**: View rankings and statistics for current and past seasons
 - **Deck Management**: Register and view player decks with budget tracking
+- **Automatic Deck Pricing**: Real-time price fetching from Scryfall API with version tracking
+- **Price History**: Track deck price changes over time with immutable snapshots
+- **Manual Price Refresh**: Users can update deck prices with a button click
 - **Game Submission**: Submit game results and track match history
 - **Rules**: View league rules and scoring system
 - **Authentication**: Secure user authentication with Firebase (Email/Password and Google Sign-In)
@@ -433,26 +436,29 @@ firebase deploy --only firestore:rules
 
 MIT License - feel free to use this project for your own league!
 
+## Documentation
+
+- **[QUICKSTART.md](QUICKSTART.md)** - Fast setup guide (10 minutes)
+- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Development guide, roadmap, and technical details
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Deployment options and instructions
+- **[FIRESTORE-INDEXES.md](FIRESTORE-INDEXES.md)** - Required Firestore indexes
+- **[CLAUDE.md](CLAUDE.md)** - Comprehensive project documentation for Claude Code
+
 ## Support
 
 For issues or questions:
 - Create an issue on GitHub
 - Contact the league organizer
-- Check the documentation in `CLAUDE.md`
+- Check **[DEVELOPMENT.md](DEVELOPMENT.md)** for known issues and troubleshooting
 
 ## Roadmap
 
-Future features to implement:
-- [ ] Deck builder with card search integration
-- [ ] Advanced statistics and analytics dashboards
-- [ ] Automatic season rollover
-- [ ] Player achievement badges
-- [ ] Match scheduling system
-- [ ] Tournament brackets
-- [ ] Mobile app (React Native/Ionic)
-- [ ] Export data to CSV/PDF
-- [ ] Admin dashboard for season management
-- [ ] Discord/Slack integration for notifications
+See **[DEVELOPMENT.md](DEVELOPMENT.md)** for the complete roadmap, including:
+- Price history viewer and bulk deck operations
+- Enhanced deck management and comparison tools
+- Social features and meta analysis
+- Tournament mode and achievements system
+- Advanced deck building tools and proxy management
 
 ---
 

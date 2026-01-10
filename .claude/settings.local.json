@@ -24,7 +24,8 @@
       "Bash(do echo \"Testing $page:\")",
       "Bash(done)",
       "Bash(xargs:*)",
-      "mcp__nuxt-ui-remote__get-component"
+      "mcp__nuxt-ui-remote__get-component",
+      "Bash(ls:*)"
     ],
     "deny": [],
     "ask": []
